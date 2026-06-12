@@ -1,0 +1,116 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Clustering}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    We discuss about clustering, which is an unsupervised learning technique which identifies groups or clusters
+    of data points.
+
+\section{K-means Clustering}
+    \subsection{Introduction}
+        \textbf{K-means Clustering} is one of the most simple clustering algorithm. It does not use any probabilistic notions,
+        and only rely on deterministic informations. K-means clustering can be seen as special case of \emph{Gaussian mixture model},
+        , a probabilistic clustering algorithm, which will be shown later.
+    
+    \subsection{Algorithm}
+        \begin{algorithm}
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            
+            \caption{K-means clustring algorithm}
+
+            \Input{$\{\textbf{x}_1,\dots,\textbf{x}_N\}$ \newline
+            number of clusters $K$ \newline
+            number of iterations $T$}
+            \Output{cluster vectors $\bm\mu_k$ \newline
+            indicator \{$r_{nk}$\}}
+
+            \BlankLine
+            \hrule
+            \tcp{initialize}
+            $\{r_{nk} \leftarrow 0\}$ for $n \in \{1,\dots,N\}$ and $k \in \{1,\dots,K\}$\;
+            \Repeat{$\{r_{nk}\}=\{r_{nk}^{(\text{old})}\}$ or iterated $T$ times}
+            {
+                \tcp{E step}
+                $\{r_{nk}^{(\text{old})}\}$\;
+                \For{$n \in \{1,\dots,N\}$}
+                {
+                    $k \leftarrow \arg\min_j\|\textbf{x}_n - \bm\mu_j\|^2$\;
+                    $r_{nk} \leftarrow 1$\;
+                    $\{r_{nk} \leftarrow 0\}$ for $j \in \{1,\dots,K\},\ j \neq k$
+                }
+                \tcp{M step}
+                \For{$k \in \{1,\dots,K\}$}
+                {
+                    $\bm\mu_k \leftarrow \frac{\sum_n r_{nk}\textbf{x}_n}{\sum_n r_{nk}}$\;
+                }
+            }
+            \Return{$\{\bm\mu_k\}$, $\{r_{nk}\}$}
+
+        \end{algorithm}
+        
+        The algorithm tries to minimize the error function $\displaystyle{J=\sum_{n=1}^{N}\sum_{k=1}^{K}r_{nk}\|\textbf{x}_n-\bm\mu_k\|^2}$,
+        where $r_{nk}$ is 1 if data point $\textbf{x}_n$ is included in cluster $k$, else 0.
+        and $\bm\mu_k$ are the 'prototype' of the cluster vector, representing the center of the clusters. The algorithm first minimize the loss function
+        about $r_{nk}$ with $\bm\mu\_k$ fixed, which is simply
+        \[r_{nk}=
+        \begin{cases}
+            1 & \text{if }k=\arg\min_j \|\textbf{x}_n-\bm\mu_j\|^2 \\
+            0 & \text{otherwise}
+        \end{cases}\]
+        This is \textbf{E step} if we look it as a kind of EM algorithm. Then, the algorithm fixes $r_{nk}$ and minimize about
+        $\bm\mu_k$. The objective function $J$ is a quadratic function of $\bm\mu_k$ and can be minimized easily, with
+        \[
+        \bm\mu_k = \frac{\sum_n r_{nk}\textbf{x}_n}{\sum_n r_{nk}}.
+        \]
+
+        We can derive a sequential version of this batchwise algorithm.
+        
+        \begin{algorithm}
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            
+            \caption{Sequential K-means clustring algorithm}
+
+            \Input{$\{\textbf{x}_1,\dots,\textbf{x}_N\}$ \newline
+            number of clusters $K$ \newline
+            number of iterations $T$}
+            \Output{cluster vectors $\bm\mu_k$ \newline
+            indicator \{$r_{n}$\}}
+
+            \BlankLine
+            \hrule
+            \tcp{initialize}
+            $\{r_{n} \leftarrow 0\}$ for $n \in \{1,\dots,N\}$ and $k \in \{1,\dots,K\}$\;
+            $\{N_k \leftarrow 0\}$\;
+            \ForEach{$\textbf{x} \in \{\textbf{x}_1,\dots,\textbf{x}_N\}$}
+                {
+                    $k \leftarrow \arg\min_j\|\textbf{x}_n - \bm\mu_j\|^2$\;
+                    $N_k \leftarrow N_k + 1$\;
+                    $r_n \leftarrow k$\;
+                    $\bm\mu_k \leftarrow \bm\mu_k + \frac{1}{N_k}(\textbf{x}_n-\bm\mu_k)$\;
+                }
+            \Return{$\{\bm\mu_k\}$, $\{r_{n}\}$}
+
+        \end{algorithm}
+        The sequential k-means algorithm does not change the data points which are already clustered,
+        unlike the original k-means algorithm, and the indicator changed from one-hot encoding to integer value.
+    \subsection{Applications}
+        K-means clustering can be used at image segmentation, specifically color segmentation.
+\section{Mixtures of Gaussians}
+    The \textbf{Gaussian mixture model} (GMM) is a simple linear superposition of Gaussian components. This can be formulated in
+    terms of discrete latent variables. See this \href{run:../../03_bayesian_ml/models/gmm/gmm.pdf}{document} for more information.
+\end{document}

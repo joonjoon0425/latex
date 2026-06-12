@@ -1,0 +1,195 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Graph Neural Network}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    \textbf{Graph neural networks} are used to capture the information under the graph structure.
+    Its main usage are:
+    \begin{itemize}
+        \item Graph classification: Classify the graph itself; ex. Molecule property prediction;
+        \item Link prediction: Predict if edge exists between nodes; ex. Recommender system;
+        \item Node / Edge classification: Classfy the nodes or edges of the graph; ex. FDS
+    \end{itemize}
+
+\section{Main Ideas}
+    \subsection{Basic Definitions}
+        \begin{defn}{Graph}{graph}
+            The \textbf{graph} $\mathcal G=(\mathcal V, \mathcal E)$ consists of set of \textbf{nodes} (or vertices) denoted by
+            $\mathcal V$, and a set of \textbf{edges} (or links) denoted by $\mathcal E$. Each nodes are
+            indexed with $n=1,2,\dots,N$ where $N$ is the total number of nodes. Edges from $n$ to $m$ is denoted by
+            $(n,m)$. If two nodes are linked by an edge, they are called \textbf{neighbors}, and set of all neighbors
+            of node $n$ is denoted by $\mathcal N(n)$. 
+        \end{defn}
+
+        We use \textbf{adjacency matrix} to denote the connections between nodes. If the edge exists
+        between node $n$ and $m$, then the element of adjacency matrix $A_{nm}=1$, else $A_{nm}=0$.
+        If the graph is undirected, the adjacency matrix is symmetric.
+    
+    \subsection{Permutation Invariance}
+        The graph structure is invariant under the permutation operation. That is, even if we change the
+        numbering of the graph, the network prediction should not change. Or, the network prediction may change,
+        applying the same permutation to the prediction without permutation. That is, the network prediction is
+        equivariant under permutation. Precise definition is given below;
+        
+        \begin{defn}{Permutation Invariance and Equivariance}{perInvEquivar}
+            Let \textbf{P} be a permutation matrix. Let $\textbf{y}(\textbf{X}, \textbf{A})$ be a network prediction defined on the
+            node data matrix \textbf{X} and adjacency matrix \textbf{A}. If the network satisfies following condition, the
+            network is \textbf{invariant} under permutation;
+            \[
+            \mathbf{y}(\tilde{\mathbf{X}}, \tilde{\mathbf{A}})=\mathbf{y}(\mathbf{X}, \mathbf{A})   
+            \]
+            where $\tilde{\mathbf{X}}=\mathbf{PX}$ and $\tilde{\mathbf{A}}=\mathbf{PA}\mathbf{P}^{\top}$.
+            If the network satisfies following condition, the network is \textbf{equivariant} under permutation;
+            \[
+            \mathbf{y}(\tilde{\mathbf{X}}, \tilde{\mathbf{A}})=\mathbf{P}\mathbf{y}(\mathbf{X}, \mathbf{A}).
+            \]
+        \end{defn}
+
+    \subsection{Neural Message Passing}
+        To use the permutation invariance and equivariance as the inductive bias of our network, it is not a good idea to
+        use ordinary operations or flattening the matrix. Instead we adopt the method of CNN, such as parameter sharing.
+        \subsubsection{Graph Convolutional Network}
+            The graph network layer should satisfy following requirements:
+                \begin{itemize}
+                    \item Handle variable-length inputs: Since the number of nodes and edges are different along graphs;
+                    \item Must be differentiable;
+                    \item Scale well: Since graphs can be very large, like social network;
+                \end{itemize}
+
+            We use the embedding vector of nodes, $\textbf{h}_n$, and use the neighbors of each nodes the collect the information
+            and make pre-activations while satisfying invariance.
+
+            \begin{algorithm}[H]
+                \DontPrintSemicolon
+                \SetArgSty{textnormal}
+                \caption{Simple message passing neural network}
+                \SetKwInOut{Input}{Input}
+                \SetKwInOut{Output}{Output}
+
+                \Input{Undirected graph $\mathcal G=(\mathcal V, \mathcal E)$
+                \newline Initial node embeddings $\{\textbf{h}_n^{(0)}\}$
+                \newline $\text{Aggregate}(\cdot)$ function
+                \newline Update($\cdot$, $\cdot$) function}
+                \Output{Final node embeddings $\{\textbf{h}_n^{(L)}\}$}
+
+                \BlankLine
+                \hrule
+
+                \For{$l\in \{0, \dots, L - 1\}$}{
+                    $\textbf{z}_n^{(0)} \leftarrow \text{Aggregate}\left(\left\{ \textbf{h}_m^{(l)}:m \in \mathcal N(n) \right\}\right)$\;
+                    $\textbf{h}_n^{(l+1)} \leftarrow \text{Update}\left(\textbf{h}_n^{(l)},\textbf{z}_n^{(l)}\right)$
+                }
+                \Return{$\{\textbf{h}_n^{(L)}\}$}
+                
+            \end{algorithm}
+
+        The Aggregate($\cdot$) function collects the information of neighbor nodes and make
+        a vector $\textbf{z}$. It must be invariant under the ordering of the embedding vector.
+        The Update($\cdot$, $\cdot$) function then update the given node with the vector $\textbf{z}$
+        and make a new node embedding vector.
+
+        \subsubsection{Aggregate Operator}
+            The possible forms for the Aggregate function are:
+            \begin{itemize}
+                \item Simple sum: $\displaystyle \text{Aggregate}\left(\left\{ \textbf{h}_m^{(l)}:m \in \mathcal N(n) \right\}\right)=\sum_{m \in \mathcal N(n)} \textbf{h}_m^{(l)}$
+                \item Divided sum: $\displaystyle \text{Aggregate}\left(\left\{ \textbf{h}_m^{(l)}:m \in \mathcal N(n) \right\}\right)=\frac{1}{|\mathcal N(n)|}\sum_{m \in \mathcal N(n)} \textbf{h}_m^{(l)}$
+                
+                    or $\displaystyle \text{Aggregate}\left(\left\{ \textbf{h}_m^{(l)}:m \in \mathcal N(n) \right\}\right)=\frac{1}{\sqrt{|\mathcal N(n)||\mathcal M(m)|}}\sum_{m \in \mathcal N(n)} \textbf{h}_m^{(l)}$
+                \item Fully connected layer: $\displaystyle \text{Aggregate}\left(\left\{ \textbf{h}_m^{(l)}:m \in \mathcal N(n) \right\}\right)=\text{MLP}_{\bm{\theta}}\left(\sum_{m \in \mathcal N(n)} \text{MLP}_{\bm{\phi}}(\textbf{h}_m^{(l)})\right)$
+                with learnable parameter $\bm{\theta}$ and $\bm{\phi}$.
+            \end{itemize}
+            
+        \subsubsection{Update Operator}
+            The possible forms for the Update function are:
+            \begin{itemize}
+                \item $\text{Update}\left(\textbf{h}_n^{(l)},\textbf{z}_n^{(l)}\right)=f(\textbf{W}_{self}\textbf{h}_n^{(l)}+\textbf{W}_{neigh}\textbf{z}_n^{(l)}+\textbf{b})$
+                , where $f$ is a nonlinear activation function and $\textbf{W}_{self}$, $\textbf{W}_{neigh}$ and $\textbf{b}$ are the learnable weights and biases. 
+            \end{itemize}
+
+    \subsection{Node Classification}
+        We can classify the nodes by applying softmax function at the last layer of the graph neural network and define a loss function as the cross-entrophy loss across all nodes and all classes.
+        We distinguish three types of nodes for training:
+        \begin{enumerate}
+            \item $\mathcal V_{train}$: Labeled, included in the message-passing operations and used to compute the loss function for training;
+            \item $\mathcal V_{trans}$: Unlabeled, included in the message-passing operations but not used to compute the loss function for training; Graph without transductive nodes can be considered as supervised learning.
+            \item $\mathcal V_{induct}$: Unlabeled, and does not participate in the training session, but participate in message-passing during inference session and labels are predicted; Graph without inductive nodes can be considered as semi-supervised learning.
+        \end{enumerate}
+    \subsection{Edge Classification}
+        We can classify the edges by defining additional edge properties. For example, to predict if the edge exists or not, we can
+        define the probability $p(n,m)$ for the presence of an edge between node $n$ and $m$ as $p(n,m)=\sigma(\textbf{h}_n^{\top}\textbf{h}_m)$.
+    \subsection{Graph Classification}
+        We can classify the graph itself, by training with a set of labeled graphs $\{\mathcal G_1, \dots,\mathcal G_N\}$. We may use
+        the final node embeddings to yield predictions about graphs. The simplest form of such approach is to take the sum of final node embeddings and pass through some activation function;
+        \[
+        \textbf{y}=\textbf{f}\left(\sum_{n \in \mathcal V}\textbf{h}_n^{(L)}\right)
+        \]
+
+\section{Extensions of Graph Neural Networks}
+    \subsection{Graph Attention Networks}
+        We can apply attention mechanism to graph networks, too! We may define the Aggregate function as following:
+        \[
+        \textbf{z}_n^{(l)}=\text{Aggregate}\left( \left\{ \textbf{h}_m^{(l)}:m \in \mathcal N(n) \right\} \right)
+        =\sum_{m \in \mathcal N(n)} A_{nm}\textbf{h}_m^{(l)}
+        \]
+        where $A_{nm}$ are the attention weights.
+        The attention weights may be defined as
+        \begin{itemize}
+            \item $\displaystyle{A_{nm}=\frac{\exp{(\textbf{h}_n^{\top}\textbf{W}\textbf{h}_m)}}{\sum_{k \in \mathcal N(n)}\exp{(\textbf{h}_n^{\top}\textbf{W}\textbf{h}_k)}}}$
+                where \textbf{W} is a learnable parameter.
+            \item $\displaystyle{A_{nm}=\frac{\exp{(\text{MLP}(\textbf{h}_n, \textbf{h}_m))}}{\sum_{k \in \mathcal N(n)}\exp{(\text{MLP}(\textbf{h}_n, \textbf{h}_k))}}}$
+                where MLP has a single continuous output and invariant to the ordering of the node. If the MLP is shared across all nodes in graph, this aggregation function is equivariant under node reordering.
+        \end{itemize}
+    \subsection{Edge and Graph Embeddings}
+        We can introduce edge embedding vectors to manage the graph whose data is associated with edges. We can also consider the graph embeddings, which relates to the whole graph.
+        This additional embeddings allow us to make richer set of graph features, and a general neural message-passing algorithm.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \caption{General massage passing neural network}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \Input{Undirected graph $\mathcal G=(\mathcal V, \mathcal E)$ \newline
+                Initial node embeddings $\{\textbf{h}_n^{(0)}\}$,
+                Initial edge embeddings $\{\textbf{e}_{nm}^{(0)}\}$,
+                Initial graph embedding $\{\textbf{g}^{(0)}\}$ \newline
+                $\text{Aggregate}_{node}(\cdot)$ function \newline
+                $\text{Update}_{node}(\cdot,\cdot,\cdot)$ function, $\text{Update}_{edge}(\cdot,\cdot,\cdot,\cdot)$ function, $\text{Update}_{graph}(\cdot,\cdot,\cdot)$ function
+            }
+            \Output{Final node embeddings $\{\textbf{h}_n^{(L)}\}$\newline
+            Final edge embeddings $\{\textbf{e}_{nm}^{(L)}\}$\newline
+            Final graph embedding $\{\textbf{g}{(L)}\}$}
+
+            \BlankLine
+            \hrule
+
+            \For{$l \in \{0, \dots, L - 1\}$}{
+                $\textbf{e}_{nm}^{(l+1)} \leftarrow \text{Update}_{edge}(\textbf{e}_{nm}^{(l)}, \textbf{h}_n^{(l)}, \textbf{h}_m^{(l)}, \textbf{g}^{(l)})$\;
+                $\textbf{z}_n^{(l+1)} \leftarrow \text{Aggregate}_{node}\left(\left\{ \textbf{e}_{nm}^{(l+1)}:m \in \mathcal N(n) \right\}\right)$\;
+                $\textbf{h}_n^{(l+1)} \leftarrow \text{Update}_{node}\left( \textbf{h}_n^{(l)}, \textbf{z}_n^{(l+1)}, \textbf{g}^{(l)} \right)$\;
+                $\textbf{g}^{(l+1)} \leftarrow \text{Update}_{graph}\left( \textbf{g}^{(l)}, \{ \textbf{h}_n^{(l+1)}, \{\textbf{e}_{nm}^{(l+1)}\} \} \right)$
+            }
+
+            \Return{$\{\textbf{h}_n^{(L)}\}$, $\{ \textbf{e}_{nm}^{(L)} \}$, $\textbf{g}^{(L)}$}
+        
+        \end{algorithm}
+
+    \subsection{Geometric Deep Learning}
+        Consider the task of predicting the properties of a molecule. The molecule can be represented as a list of
+        spatial coordinates and types. If we use neural network for prediction, the network must be invariant of reordering of the nodes, and specific coordinate system.
+        To meet these requirements, we can use graph neural network with embedding vector $\textbf{r}_n$, with a slightly different Aggregate function and Update function;
+        we replace the place of node embeddings with relative distance between nodes such as squared distances. For more information of these functions, see Satorras, Hoogeboom, and Welling, 2021 or Bishop, 2023.
+        
+        Capturing such geometric symmetric features and taking it into account of the structure of the network forms the basis of a rich field of
+        \textbf{geometric deep learning} (Bronstein \emph{et al.}, 2017; Bronstien \emph{et al.}, 2021).
+\end{document}

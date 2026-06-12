@@ -1,0 +1,208 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Convolutional Neural Network}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\newpage
+\section{Introduction}
+    \textbf{Convolutional Neural Network} (CNN) is used to process mainly the image data.
+    Processing image directly by just flattening image data leads to enormous amount of calculation,
+    and it losts the local relevance between pixels. CNN solves this problem.
+    CNN has some remarkable properties:
+    \begin{enumerate}
+        \item Invariance and equivariance about geometric transformations;
+        \item Exploits local relevance of pixels. This is implemented via convolutional filters;
+        \item Shares parameters, which leads to fewer parameters compared to fully connected layer; 
+    \end{enumerate}
+
+\newpage
+\section{Main Ideas}
+    \subsection{Invariance and Equivariance}
+        This section show the idea of mathematically precise meaning of consistancy under geometric transformations.
+
+        \begin{defn}{Invariance}{invariance}
+            Fuction $\textbf{f}[\textbf{x}]$ of an image \textbf{x} is \textbf{invariant} to a transformation
+            $\textbf{t}[\textbf{x}]$ if
+            \[
+            \textbf{f}[\textbf{t}[\textbf{x}]]=\textbf{f}[\textbf{x}]
+            \]
+        \end{defn}
+        In other word, the output is same regardless of the transformation \textbf{t}[\textbf{x}].
+        Networks for image classification should maintain this property.
+        That is, even if the image of a cat is shifted or scaled, the CNN must still classify it as cat.
+
+        \begin{defn}{Equivariance}{equivariance}
+            Fuction $\textbf{f}[\textbf{x}]$ of an image \textbf{x} is \textbf{equivariant} (or covariant) to a transformation
+            $\textbf{t}[\textbf{x}]$ if
+            \[
+            \textbf{f}[\textbf{t}[\textbf{x}]]=\textbf{t}[\textbf{f}[\textbf{x}]]
+            \]
+        \end{defn}
+        That is, if the input has gone through some geometric transformation,
+        the output must be same as the original output with same geometric transformation applied.
+        Networks for image segmentation should maintain this property.
+
+    \subsection{Convolution}
+        Now we discuss about convolution operation, the heart of CNN.
+        \subsubsection{1D Convolution Operation}
+            First, we discuss about 1D convolution operation.
+            We can think of this as just simply calculating the weighted average of nearby inputs.
+            \begin{defn}{1D Convolution}{1Dconv}
+                Let \textbf{x} be a vector, and \textbf{w} be a weight vector, which is called \textbf{kernel}.
+                Than, the 1D convolution operation $\ast$, whose result is also a vector, is defined as follows:
+                \[
+                (\textbf{x} \ast \textbf{w})_n = \sum_{m=-\infty}^{\infty}\textbf{x}_m\textbf{w}_{n-m}
+                \]
+            \end{defn}
+            Actually in practice, we use another definition, known as cross-correlation.
+            \begin{defn}{1D cross-correlation}{1Dcrosscorr}
+                Let \textbf{x} be a vector, and \textbf{w} be a kernel.
+                Than, the 1D cross-correlation $\star$, whose result is also a vector, is defined as follows:
+                \[
+                (\textbf{x} \star \textbf{w})_n = \sum_{m=-\infty}^{\infty}\textbf{x}_m\textbf{w}_{m-n}
+                \]
+            \end{defn}
+            From now on, we will refer to cross-correlation as convolution.
+            \begin{exm}{Convolution Operation(cross-correlation)}{1Dcrosscorr}
+                Let $\textbf{x}\in\mathbb{R}^n$ and $\textbf{w}\in\mathbb{R}^3$. Let $\textbf{z}=\textbf{x}\ast\textbf{w}$.
+                Than, $z_i=w_1x_{i+1}+w_2x_{i+2}+w_3x_{i+3}$. You can think of this as a window passing through the data, making a dot product.
+                Regard the value of data as 0 where the index is out of range. This is called a padding, which we will discuss later.
+            \end{exm}
+
+        \subsubsection{Padding, Stride, Kernel Size, and Dilation}
+            Now we present definitions of padding, stride, kernel size and dilation, which alters the
+            convolution operation a bit.
+            \begin{defn}{Padding, Stride, Kernel Size, and Dilation}{PSKD}
+                \begin{itemize}
+                    \item \textbf{Padding} is used to deal with the data index out of range.
+                        The most common method is \textbf{zero-padding}, where we fill the undefined value with 0.
+                        We also can regard the input as circular or reflecting it at the boundaries. Or, we can just ignore the convolution result
+                        when the data index is out of range, introducing no extra information. This is called \textbf{valid convolutions}, but this method decreases the representation in size.
+                    \item \textbf{Stride} is used to control the step of kernel moving through the data. The Definition \ref{defn:1Dcrosscorr} or \ref{defn:1Dconv} uses stride 1.
+                        If we use stride $k$, the next element $z_{i+1}$ of Example \ref{exm:1Dcrosscorr} is $z_{i+1}=w_1x_{i+1 + k}+w_2x_{i+2 + k}+w_3x_{i+3 + k}$
+                        
+                    \item \textbf{Kernel size} is just the dimension of the weight vector used as kernel. The kernel in Example \ref{exm:1Dcrosscorr} has kernel size 3. If the kernel size grows, than we can deal with larger area of the data at once, using more informations.
+                        However, this results in more weights. This leads to the idea of dilated or atrous convolutions.
+                    \item \textbf{Dilation} is to make the kernel sparse. That is, some of the weight value of the kernel is 0, which enables bigger kernel size with not-so-mush weights.
+                        For example, if we use \textbf{dilation rate} 2, which means the next non-zero weight comes after two element, to Example \ref{exm:1Dcrosscorr},
+                        the result is $z_i=w_1x_{i+1}+w_2x_{i+3}+w_3x_{i+5}$. Here we did not actually increased tye kernel size, but chaged the data being multiplied.
+                \end{itemize}
+            \end{defn}
+
+        % TODO: add a figure explaining stride, kernel size, padding and dilation.
+            We can calculate the size of the output result of the convolution by the follwing formula.
+            \begin{thm}{Resulting Size of the 2D Convolution}{ConvSize}
+                Let the input data have size $J \times K$ and have $P$ padding. Let the kernel have size $M \times M$ and have stride $S$.
+                Then the resulting size of the convolution is
+                \[
+                \left\lfloor \dfrac{J + 2P - M}{S}-1 \right\rfloor
+                \times
+                \left\lfloor \dfrac{K + 2P - M}{S}-1 \right\rfloor
+                \]
+            \end{thm}
+
+        \subsubsection{Channels}
+            \begin{defn}{Channel}{channel}
+                \textbf{Channel} is a hidden layer created by the convolution, which is also referred to as \textbf{feature map}.
+            \end{defn}
+            There can be more than one channel, if we use more than one convolutional kernel filters.
+            In practice, we produce more than one channel since only using one convolutional operation would lost some informations.
+            Input variables also can have more than one channel. For example, an image data would have three to four channels, since it has RGB values or RGBA values.
+        
+        \subsubsection{Receptive Fields}
+            \begin{defn}{Receptive Fields}{ReceptiveField}
+                The \textbf{receptive field} of a hidden layer is the region of the original input that feeds into it.
+            \end{defn}
+            \begin{exm}{Size of Receptive Field of Hidden Layer}{szRFH}
+                Let's assume that we apply convolution operation two times, with same kernel with kernel size 3.
+                Then, each element of the first hidden layer would have been calculated with three input data.
+                So, the size of the receptive field of the first hidden layer is 3.
+                Each element of the second hidden layer would have been calculated with five input data, since
+                \begin{align*}
+                    z_i^{(2)} &= w_1z_{i+1}^{(1)}+w_2z_{i+2}^{(1)}+w_3z_{i+3}^{(1)} \\
+                    &=w_1^2x_{i+2}+2w_1w_2x_{i+3}+(2w_1w_3+w_2^2)x_{i+4}+2w_2w_3x_{i+5}+w_3^2x_{i+6}
+                \end{align*}
+                as you can see. The size of receptive field is 5. 
+            \end{exm}
+
+        \subsubsection{2D Convolution Operation}
+            2D convolution operation is similar to 1D convolution operation.
+            The definitions discussed above can be extended to 2D convolution operations easily.
+            \begin{defn}{2D Convolution Operation}{2Dconvop}
+                Let $\textbf{X}\in\mathbb{R}^{n \times m}$, and let $\textbf{W}\in\mathbb{R}^{k \times l}$.\
+                Then, 
+                \[
+                (\textbf{X} \ast \textbf{W})_{i,j}=
+                \sum_{p=1}^{k}\sum_{q=1}^{l}X_{i+p, j+q}W_{p, q}
+                \]
+            \end{defn}
+            This operation can be also thought as weighted average over nearby pixels.
+
+        \subsubsection{Toeplitz Matrix}
+            Convolution operation can be expressed in matrix multiplication form, due to the famous
+            \textbf{Fundamental Theorem of Linear Algebra}, which states that any linear operation can be expressed in matrix form.
+            The convolution has matrix expression, where the matrix is of special kind, called \textbf{Toeplitz matrix}.
+            \begin{defn}{Toeplitz Matrix}{ToepMat}
+                ADD THE DEFINITION OF TOEPLITZ MATRIX
+            \end{defn}
+
+            \begin{exm}{Matrix Representation of Convolution Operation}{MatRepConvOp}
+                ADD THE EXAMPLE OF MATRIX REPRESENTATION OF CONVOLUTION
+            \end{exm}
+        
+    \subsection{Downsampling, Upsampling, and Changing the Number of Channels}
+        \subsubsection{Downsampling}
+            \textbf{Downsampling} is to decrease the size of 2D input representations.
+            There are some methods to do this:
+            \begin{enumerate}
+                \item \textbf{Increase the stride}. If we use stride of size 2, then the result hidden layer is scaled down to half.
+                \item \textbf{Max Pooling}. Max pooling picks the maximum value from $2 \times 2$ input values. This induces some invariance to translation; moving about one pixel won't change the result of max pooling.
+                \item \textbf{Average Pooling}. Average pooling calculates the average value of $2 \times 2$ input values and use it as a value of downscaled data.
+            \end{enumerate}
+            Downsampling is applied to each channels, so after the downsampling, the number of channels won't change.
+        \subsubsection{Upsampling}
+            \textbf{Upsampling} is to scale up the resolution of the data.
+            \begin{enumerate}
+                \item \textbf{Duplicate the data}. This is the simplest way to double the resolution.
+                \item \textbf{Max Unpooling}. Max unpooling is used when we previously used a max pooling operation for downsampling.
+                    We distribute the value to the position where it originated from.
+                \item \textbf{Bilinear Interpolation}. Fill the missing values between points with known values using bilinear interpolation.
+                \item \textbf{Transposed Convolution}. Using stride 2 kernel decrease the size to half. Transposed convolution does this in kind of opposite way, doubling the size.
+                    The reason that this is called transposed convolution is because matrix representation of the operation
+                    is same as the transpose of that of ordinary convolution operation.
+                    The kernel used in transposed convolution need not be the same as the one used in the preceding convolution.
+            \end{enumerate}
+
+            \begin{rem}{Transposed Convolution}{TransConv}
+                Transposed convolution can be implemented via ordinary convolution with dilation. The point is that the dilation is applied to the input data, not the kernel.
+                Let's assume that we used stride $s$ kernel in convolution operation. Then, to retrieve the data to the original size using transposed convolution,
+                we take the following step:
+                \begin{enumerate}
+                    \item Add $s-1$ zeros between each input data.
+                    \item Flip the kernel (if you are using same kernel used in convolution operation).
+                    \item Do the original convolution.
+                \end{enumerate}
+            \end{rem}
+        \subsubsection{Changing the Number of Channels}
+            To change the number of channel itself, go through the following step. 
+            \begin{enumerate}
+                \item Calculate the weighted sum of each channel element at the same position.
+                \item Apply activation functions if one wants.
+                \item We can repeat this as much as we want, decreasing or increasing the number of channels.
+            \end{enumerate}
+            If the input has $C_i$ channels and the output has $C_o$ channels, then there are $1 \times 1 \times C_i \times C_o$ weights.
+            Hence, this is known as $1\times1$ convolution.
+            This is same as making fully connected layer at the input channels with output of size same as the number of output channels we want.
+
+\newpage
+\section{Applications}
+
+
+\end{document}

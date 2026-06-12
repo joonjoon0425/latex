@@ -1,0 +1,17 @@
+\contentsline {chapter}{\numberline {1}Multi-armed Bandits}{1}{chapter.1}%
+\ttl@starttoc {chapters@1}
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1.1}%
+\contentsline {section}{\numberline {2}$k$-armed Bandit Problem}{2}{section.1.2}%
+\contentsline {section}{\numberline {3}Balancing between Exploring and Exploiting}{2}{section.1.3}%
+\contentsline {subsection}{\numberline {3.1}Action-Value Methods}{2}{subsection.1.3.1}%
+\contentsline {subsubsection}{\numberline {3.1.1}Estimation of Value}{2}{subsubsection.1.3.1.1}%
+\contentsline {paragraph}{\numberline {3.1.1.1}Methods for Stationary Bandit Problem}{2}{paragraph.1.3.1.1.1}%
+\contentsline {paragraph}{\numberline {3.1.1.2}Methods for Non-stationary Bandit Problem}{3}{paragraph.1.3.1.1.2}%
+\contentsline {subsubsection}{\numberline {3.1.2}Selection of Actions}{4}{subsubsection.1.3.1.2}%
+\contentsline {paragraph}{\numberline {3.1.2.1}Greedy Action Selection}{4}{paragraph.1.3.1.2.1}%
+\contentsline {paragraph}{\numberline {3.1.2.2}$\varepsilon $-greedy Selection}{4}{paragraph.1.3.1.2.2}%
+\contentsline {paragraph}{\numberline {3.1.2.3}Upper-Confidence-Bound Action Selection}{5}{paragraph.1.3.1.2.3}%
+\contentsline {subsubsection}{\numberline {3.1.3}Optimistic Initial Values}{5}{subsubsection.1.3.1.3}%
+\contentsline {subsection}{\numberline {3.2}Gradient Bandit Algorithm}{5}{subsection.1.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}Algorithm}{6}{subsubsection.1.3.2.1}%
+\contentsfinish 

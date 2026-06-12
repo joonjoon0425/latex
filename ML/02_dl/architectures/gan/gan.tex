@@ -1,0 +1,174 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Generative Adversarial Networks}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+A \textbf{generative adversarial network} (GAN) is an unsupervised network, which aims to
+generate new samples that are indistinguishable from original data. GAN is just an architecture
+for creating new samples, so it cannot evaluate probability if a new sample belongs to the original
+distribution.
+
+
+\section{Main Idea}
+    \subsection{Generator and Discriminator}
+        GAN uses two distinct networks; the \textbf{discriminator} and \textbf{generator}.
+        The discriminator network classifies a given data; it classifies if the given data is created by generator or not.
+        The generator network's objective is to create samples that can deceive a discriminator.
+        The idea is simple, but GAN itself is hard to train. We'll discuss more about this in section \ref{sec:exGAN}.
+
+        The generator creates new samples by first picking a latent variable $\textbf{z}$ from some base distribution
+        and passing this variable through a network $\textbf{g}(\textbf{z}, \bm{\theta})$ with parameter $\bm{\theta}$.
+        The goal is to find parameter $\bm{\theta}$ that creates sample indistinguishable from original dataset. This
+        indistinguishableness, is defined to be statistically indistinguishable from the true data.
+
+        The discriminator network $\textbf{f}(\textbf{x}, \bm{\phi})$ with parameter $\bm{\phi}$ discriminates
+        whether the given data \textbf{x} is created by generator or not.
+
+    \subsection{Training GAN}
+        \subsubsection{Loss Function for GAN}
+            The GAN uses binary cross entropy loss for training discriminator. Generator is trained to increase the loss, when
+            discriminator parameter is fixed.
+            \begin{defn}{Loss Function for GAN}{lossFnGAN}
+                Let $\textbf{g}(\textbf{z}, \bm{\theta})$ and $\textbf{f}(\textbf{x}, \bm{\phi})$ be generator and discriminator, respectively,
+                where $\textbf{z}_j$ is a latent variable and $\bm{\theta}$ and $\bm{\phi}$ are parameters.
+                Let $\textbf{y}_j$ be a sample created by the generator with latent variable $\textbf{z}_j$,
+                and let $\textbf{x}_i$ be the original data.
+                Then, the loss for GAN is defined as following:
+                \[
+                \sum_{j} -\log{(1 - \sigma(\textbf{f}(\textbf{y}_j, \bm{\phi})))}
+                -\sum_{i} -\log{(\theta(\textbf{f}(\textbf{x}_i, \bm{\phi})))}
+                \]
+                which can be written as
+                \[
+                \sum_{j} -\log{(1 - \sigma(\textbf{f}(\textbf{g}(\mathbf{z}_j, \bm{\theta}), \bm{\phi})))}
+                -\sum_{i} -\log{(\theta(\textbf{f}(\textbf{x}_i, \bm{\phi})))}
+                \]
+                
+            \end{defn}
+        \subsubsection{Training Generator and Discriminator}
+            Given the loss function above, the discriminator first tries to minimize the loss function,
+            by adjusting $\bm{\phi}$. Then, the generator tries to maximize the loss with $\bm{\phi}$ fixed, by
+            adjusting $\bm{\theta}$. Technically, the solution is \emph{Nash Equilibrium}.
+
+            \begin{defn}{Training Discriminator}{trainDisc}
+                The loss function for the discriminator is
+                \[
+                \mathcal L_{discriminator} (\bm{\phi}) = \sum_{j} -\log{(1 - \sigma(\textbf{f}(\textbf{g}(\mathbf{z}_j, \bm{\theta}), \bm{\phi})))}
+                + \sum_{i} -\log{(\sigma(\textbf{f}(\textbf{x}_i, \bm{\phi})))}
+                \]
+                using the notation of Definition \ref{defn:lossFnGAN}.
+            \end{defn}
+
+            \begin{defn}{Training Generator}{trainGen}
+                The loss function for the generator is
+                \[
+                \mathcal L_{generator} (\bm{\theta}) =
+                \sum_{j} \log{(1 - \sigma(\textbf{f}(\textbf{g}(\mathbf{z}_j, \bm{\theta}), \bm{\phi})))}
+                \]
+                using the notation of Definition \ref{defn:lossFnGAN}. The second function is dropped since it has
+                no dependence on $\bm{\theta}$, and the leftover is multiplied by -1.
+            \end{defn}
+
+            We draw a batch of latent variables $\textbf{z}_j$, and create samples. Then we choose a batch of real examples
+            $\textbf{x}_i$. Then we perform gradient descents on each loss function.
+
+
+\section{Extensions of GAN}\label{sec:exGAN}
+    \subsection{WGAN}
+        \subsubsection{Introduction}
+            The original GAN architecture is difficult to train. The training itself is unstable,
+            and even though it is trained well, it may suffer from \textbf{mode dropping} and \textbf{mode collapse}.
+            If the generator succesfully deceives discriminator but creates only a subset of whole data, this is called mode dropping.
+            If this phenomenon gets extreme, the generator creates only one sample, ignoring the latent variable.
+            This is called mode collapse.
+
+        \subsubsection{Analysis of GAN Loss Function}
+            To figure out why the mode dropping and collapse happen, let's examine the loss function of
+            GAN more precisely.
+            \begin{thm}{Analysis of GAN Loss Function}{ganLossAnalysis}
+                Let $p$ be the original distribution of the data, and let $q$ be the the distribution over the generated samples.
+                Then, the loss of GAN function can be interpreted as the \textbf{Jensen-Shannon divergence}, ignoring the additive and multiplicative
+                constants;
+                \[
+                \mathcal{L}_{discriminator}(\bm{\phi})=-\int q(\textbf{x})\log{\frac{q(\textbf{x})}{q(\textbf{x}) + p(\textbf{x})}}d\textbf{x}
+                -\int p(\textbf{x})\log{\frac{p(\textbf{x})}{q(\textbf{x}) + p(\textbf{x})}}d\textbf{x}
+                \]
+                where Jensen-Shannon divergence is defined as:
+                \[
+                D_{JS}(q||p) = \frac{1}{2}\int q(x)\log{\frac{2q(\textbf{x})}{q(\textbf{x}) + p(\textbf{x})}}d\textbf{x}
+                + \frac{1}{2}\int p(x)\log{\frac{2p(\textbf{x})}{q(\textbf{x}) + p(\textbf{x})}}d\textbf{x}
+                \]
+            \end{thm}
+
+            Whenever the sample density $q(x)$ is high and the mixture $q(x) + p(x)$ has high probability, the first
+            term of JS divergence will be small. That is, the first term penalizes regions where there generated samples are plenty
+            but real samples are not; if enforces \emph{quality}.
+            Vice versa, the second term penalizese regions with plenty of real samples and sparse generated samples; it enforces \emph{coverage}.
+            Since the second term does not depend on generator, generator does not care about the coverage of the samples being created.
+            This can be a reason of mode dropping and collapse.
+
+        \subsubsection{Vanishing Gradients}
+            When the discriminator is optimal, it maximizes the JS-divergence between two distributions.
+            If the probability distributions are completely disjoint, this distance is maximal, which will be a constant of $\log{2}$.
+            So any small change to the generator won't decrease the loss.
+            The problem is that the distributions of samples and original dataset may really be disjoint, which
+            makes training impossible.
+
+        \subsubsection{EM Distance}
+            To solve the problem, we use different distance metric called \textbf{EM distance} or \textbf{Wasserstein distance}.
+            EM distance is defined as follows:
+            \begin{defn}{EM Distance}{emDist}
+                Let $p$ and $q$ be probability distribution. The \textbf{EM distance} $W(p,q)$ between $p$ and $q$ is defined by the equation
+                \[
+                W(p,q)=\inf_{\gamma \in \prod(p,q)}\mathbb E_{(x,y) \sim \gamma}[\|x-y\|]
+                \]
+                where $\prod(p,q)$ is sets of all possible joint distribution over $p$ and $q$.
+            \end{defn}
+            We can think of $\gamma$ as a transport plan. The EM distance, as we can see from its name,
+            can be understood as the minmum transport cost used to transport $p$ to $q$.
+            This can be understood better when the distributions are discrete.
+
+            Using this equation directly is impossible since finding the infimum in
+            high-dimensional space is tremendously costly. So, we use the duality property of the optimization theory.
+            Then, the equation can be written as
+            \[
+            W(p,q)=\sup_{\|f\|_L \leq 1}(\mathbb E_{x \sim p}[f(x)] - \mathbb E_{y \sim q}[f(y)]),
+            \]
+            where $\|f\|_L \leq 1$ denotes the Lipschitz condition, $\|\nabla_{\textbf{x}}f(\textbf{x}, \bm{\phi})\| \leq 1$.
+            Now the objective is to find the function $f$, called \textbf{critic}, which is usually trained with neural network.
+        
+        \subsubsection{WGAN}
+            We now define Wasserstein GAN loss function and use it to train GAN.
+            \begin{defn}{Wasserstein GAN Loss Function}{wassGANLossFn}
+                Let $\textbf{z}_j$ be a latent variable and let $\textbf{x}_i$ be a given real samples.
+                The \textbf{Wasserstein GAN loss function} is given as following:
+                \[
+                \mathcal L = \sum_{j} f(\textbf{g}(\textbf{z}_j, \bm{\theta}), \bm{\phi}) - \sum_{i} f(\textbf{x}_i, \bm{\phi}),
+                \ \text{with} \ \|\nabla_{\textbf{x}}f(\textbf{x}, \bm{\phi})\| \leq 1
+                \]
+                where \textbf{g} is a generator network, and $f$ is a critic network.
+            \end{defn}
+
+            The expectation terms are approximated with sums about samples, and the condition $\|\nabla_{\textbf{x}}f(\textbf{x}, \bm{\phi})\| \leq 1$
+            is called \textbf{Lipschitz condition}.
+
+            To achieve this, we use one of the following methods:
+            \begin{enumerate}
+                \item Clip the gradient; This is the what the original WGAN uses.
+                \item Add a regularization term, penalizing when the gradient norm is bigger than one; This is called WGAN-GP,
+                    where GP stands for \emph{gradient penalty}.
+            \end{enumerate}
+
+            The \emph{critic} has same objective as the discriminator of original GAN. However, the critic
+            does not produce probability. Instead, it calculates a score that measures the sample's proximity to
+            the real data distribution.
+
+\end{document}

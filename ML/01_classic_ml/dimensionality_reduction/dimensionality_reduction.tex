@@ -1,0 +1,107 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Dimensionality Reduction}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    This document presents the methods of \textbf{dimensionality reduction}, which embeds dataset in the higher dimension to a lower dimension
+
+\section{Principal Component Analysis}
+    \subsection{Introduction}
+        \textbf{Principal component analysis} (PCA) is the most simple dimensionality reduction method. PCA apply a linear projection from high dimension
+        to a lower dimension.
+    \subsection{Derivation of PCA}
+        We can derive PCA in two ways; by maximizing the variance of transformed dataset, or by minimizing the projection error. 
+        The main idea is that we assume that the dataset can be formed as a linear combination of lower dimensional embedding vectors, which are believed to
+        be managable then the original dataset, i.e., $\tb x = \tb{Wz}$.
+        And our objective is to find out the matrix $\tb W$ that best 
+        \subsubsection{Maximum Variance Formulation}
+        TODO
+        \subsubsection{Minimum Error Formulation}
+        TODO
+    \subsection{Algorithm}
+        \begin{algorithm}[H]\label{alg:PCA}
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{Principal component analysis}
+
+            \Input{dataset $\textbf{X} \in \mathbb{R}^{N \times D}$ \newline
+            lower dimension $M < D$}
+            \Output{dataset $\tilde{\textbf{X}} \in \mathbb{R}^{N \times M}$ with reduced dimension}
+
+            \BlankLine
+            \hrule
+            $\overline{\textbf{x}} \leftarrow \frac{1}{N}\sum_{n=1}^{N}\textbf{x}_n$\;
+            $\textbf{S} \leftarrow \frac{1}{N}\sum_{n=1}^{N}(\textbf{x}_n-\overline{\textbf{x}})(\textbf{x}_n-\overline{\textbf{x}})^{\top} = \frac{1}{N}\overline{\textbf{X}}^\top\overline{\textbf{X}}$\;
+            $\{\textbf{u}_i\}_{i \in \{1,\dots,M\}} \leftarrow$ normalized eigenvectors of \textbf{S} with associated eigenvalues in decreasing order\;
+            \BlankLine
+            $\textbf{U} \leftarrow \begin{bmatrix} \textbf{u}_1^\top \\ \vdots \\ \textbf{u}_M^\top \end{bmatrix}$\;
+            \BlankLine
+            $\tilde{\textbf{X}} \leftarrow \textbf{X}\textbf{U}^\top$\;
+            \Return{$\tilde{\textbf{X}}$}
+        \end{algorithm}
+        The matrix \textbf{S} is called \textbf{data covariance matrix}.
+
+        When the dimensionality of the data is substantially greater than the number of data, i.e., $N \ll D$,
+        the original PCA is infeasible, since its computational cost is $\mathcal{O}(D^3)$. Also, since $N$ points defines a linear subspace whose dimensionality is at most $N-1$,
+        there is little point in applying PCA for dimension higher than $N$.
+        We can overcome this with a slight modification of the orignial algorithm, with computational cost $\mathcal{O}(N^3)$.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{Modified PCA}
+
+            \Input{dataset $\textbf{X} \in \mathbb{R}^{N \times D}$ \newline
+            lower dimension $M < N$}
+            \Output{dataset $\tilde{\textbf{X}} \in \mathbb{R}^{N \times M}$ with reduced dimension}
+
+            \BlankLine
+            \hrule
+            $\overline{\textbf{x}} \leftarrow \frac{1}{N}\sum_{n=1}^{N}\textbf{x}_n$\;
+            $\overline{\textbf{X}} \leftarrow \begin{bmatrix} \textbf{x}_1^\top \\ \vdots \\ \textbf{x}_N \end{bmatrix}$\;
+            $\textbf{S}' \leftarrow \frac{1}{N}\overline{\textbf{X}}\,\overline{\textbf{X}}^\top$\;
+            $\{\textbf{v}_i\}_{i \in \{1,\dots,M\}} \leftarrow$ eigenvectors of $\textbf{S}'$ with associated eigenvalues in decreasing order\;
+            $\textbf{u}_i \leftarrow \textbf{X}^\top\textbf{v}_i$\;
+            $\textbf{u}_i \leftarrow \frac{\textbf{u}_i}{\|\textbf{u}_i\|}$\;
+            $\textbf{U} \leftarrow \begin{bmatrix} \textbf{u}_1^\top \\ \vdots \\ \textbf{u}_M^\top \end{bmatrix}$\;
+            \BlankLine
+            $\tilde{\textbf{X}} \leftarrow \textbf{X}\textbf{U}^\top$\;
+            \Return{$\tilde{\textbf{X}}$}
+        \end{algorithm}
+    
+    \subsection{Application of PCA}
+        PCA is mainly used for data compression.
+
+        PCA can be used in data preprocessing, which is called \emph{whitening} or \emph{sphering} the data. It does the same thing what \emph{standard scaling} does,
+        but with a more substantial normalization, making different variables decorrelated.
+        To do this, we first write the eigenvector equation in Algorithm \ref{alg:PCA} as
+        \[
+        \textbf{S}\textbf{U}^\top=\textbf{U}^\top\textbf{L}
+        \]
+        where \textbf{S} is data covariance matrix, and $\textbf{L}=\text{diag}(\lambda_1,\dots,\lambda_N)$. Then we transform each data vector as
+        \[
+        \textbf{y}_n = \textbf{L}^{-1/2}\textbf{U}(\textbf{x}_n-\overline{\textbf{x}}).
+        \]
+        The set $\{\textbf{y}_n\}$ has zero mean and identity covariance. 
+    \subsection{Extensions of PCA}
+        \subsubsection{Probabilistc PCA}
+        TODO
+        \subsubsection{Kernel PCA}
+        TODO
+\section{Linear Discriminant Analysis}
+    TODO
+\end{document}

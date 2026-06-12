@@ -1,0 +1,196 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+\chapter{Dynamic Programming}
+\makeSubfileHeader{Dynamic Programming}
+
+\section{Introduction}
+    \textbf{Dynamic programming} (DP) refers to a collection of algorithms which finds out optimal policies
+    given a \emph{perfect} model of MDP. Since it requires perfect MDP model and has expensive computational cost,
+    DP is not used so much in real applications. However, the methods shown later
+    (Monte Carlo, Temporal Difference) are all rooted from dynamic programming. DP is a foundation of these methods.
+
+\section{Policy Evaluation}
+    First, we consider how to compute the state-value function $v_\pi$ when a policy $\pi$ is given.
+    Using the Bellman equation, we can get an \emph{iterative policy evaluation algorithm}.
+    Starting with initial state-value function $v_0$, we update the state-value function as following;
+    \begin{align}
+        v_{k+1}(s) &= \E_\pi[R_{t+1}+\gamma v_k(S_{t+1}|S_t=s)] \\
+        &= \sum_{a}\pi(a|s)\sum_{s',r}p(s',r|s,a)[r + \gamma v_k(s')] \label{iterPolicyEvalUpdate}
+    \end{align}
+    for all $s \in \mathcal{S}$.
+    We can see that $v_k=v_\pi$ is the fixed point for this update rule. The sequence $\{v_k\}$ is known to converge to
+    $v_\pi$ under the same condition that guarantee the existence of $v_\pi$. The algorithm pseudocode is given as follows.
+
+    \Algorithm{iterativePolicyEval}
+    {Iterative Policy Evaluation Algorithm}
+    {\inputitem{$p(s',r|s,a)$}{the dynamics of given finite MDP} \\
+    \inputitem{$\pi$}{given policy}}
+    {\inputitem{$v_\pi$}{the state-value function}}
+    {
+        $\theta \leftarrow \text{appropriate threshold value for convergence}$\;
+        initialize $V(s)$ for all $s \in \mathcal{S}^+$ except that $V(terminal)=0$\;
+        \Repeat{$\Delta < \theta$}
+        {
+            $\Delta \leftarrow 0$\;
+            \ForEach{$s \in \mathcal{S}$}
+            {
+                $v \leftarrow V(s)$\;
+                $V(s) \leftarrow \sum_{a}\pi(a|s)\sum_{s',r}p(s',r|s,a)[r + \gamma V(s')]$\;
+                $\Delta \leftarrow \max(\Delta, |v-V(s)|)$\;
+            }
+        }
+        \Return{$V \simeq v_\pi$}
+    }
+
+    One can notice that the algorithm \ref{alg:iterativePolicyEval} is not really same as the update equation \ref{iterPolicyEvalUpdate}.
+    When updating the value of state, we may use the values of states that are newly updated, unlike the equation \ref{iterPolicyEvalUpdate}.
+    However, this is also known to converge well, even more quickly than when only using the old values of states.
+    This is intuitively reasonable since the new values can be regarded more closer to the real value.
+
+\section{Policy Improvement}
+    Now we have evaluated the value function. Our next step is to improve the policy with the state-value function we computed.
+    The improvement of the policy has its root on the \emph{policy imporvement theorem}:
+    \begin{thm}{Policy Improvement Theorem}{policyImprove}
+        Let $\pi$, $v_\pi$ and $q_\pi$ be a given deterministic policy and state-value function and action-value function
+        of the policy $\pi$, respectively. Let $\pi'$ be another deterministic policy. Then, the following holds:
+        \begin{equation}
+            q_\pi(s,\pi'(s)) \geq v_\pi(s) \Rightarrow v_{\pi'}(s) \geq v_\pi(s) \text{ for all } s \in \mathcal{S} \label{policyImproveThm}
+        \end{equation}
+        Moreover, if there is a strict inequality of the equation \ref{policyImproveThm} of left-hand side at any state, then there must be strict inequality of the right-hand side of the equation \ref{policyImproveThm} at that state.
+    \end{thm}
+    The idea behind the proof of this statement is quite straightforward.
+    We let the policy $\pi'$ to be identical to $\pi$ except that $\pi'(s) = a \neq \pi(s)$. It is given as follows:
+    \begin{align*}
+        v_\pi(s) &\leq q_\pi(s,\pi'(s)) \\
+        &=\E[R_{t+1} + \gamma v_\pi(S_{t+1} | S_t = s, A_t = \pi'(s))] \\
+        &=\E_{\pi'}[R_{t+1} + \gamma v_\pi(S_{t+1})|S_t=s] \\
+        &\leq \E_{\pi'}[R_{t+1} + \gamma q_\pi(S_{t+1},\pi'(S_{t+1})|S_t=s)] \\
+        &=\E_{\pi'}[R_{t+1} + \gamma E_{\pi'}[R_{t+2} + \gamma v_\pi(S_{t+2}|S_{t+1},A_{t+1}=\pi'(S_{t+1}))|S_t=s]] \\
+        &=\E_{\pi'}[R_{t+1}+\gamma R_{t+2} + \gamma^2v_\pi(S_{t+2})|S_t=s] \\
+        &\leq\E_{\pi'}[R_{t+1}+\gamma R_{t+2} + \gamma^2R_{t+3}+\gamma^3v_\pi(S_{t+3})|S_t=s] \\
+        &\vdots\\
+        &\leq\E_{\pi'}[R_{t+1}+\gamma R_{t+2} + \gamma^2R_{t+3}+\gamma^3R_{t+4} + \dots |S_t=s] \\
+        &=v_{\pi'}(s).
+    \end{align*}
+
+    Now, considering the changes at all states and to all possible actions, we consider the new \emph{greedy} policy $\pi'$ given by
+    \begin{align}
+        \pi'(s)&=\arg\max_{a \in \mathcal{A}(s)}q_\pi(s, a)\\
+        &=\arg\max_{a \in \mathcal{A}(s)}\E[R_{t+1}+\gamma v_\pi(S_{t+1})|S_t=s,A_t=a] \label{greedyPolicy} \\ 
+        &=\arg\max_{a \in \mathcal{A}(s)}\sum_{s',r}p(s',r|s,a)[r + \gamma v_\pi(s')]
+    \end{align}
+    This process, making the original policy greedy with respect to the value function of the original policy, is called \emph{policy improvement}.
+    
+    It is guranteed for a policy to strictly improve unless the original policy is already optimal; Let $\pi'$ be a policy that is as good but not better than $\pi$.
+    Then, $v_\pi=v_{\pi'}$ and from the equation \ref{greedyPolicy}, it follows that for all $s \in \mathcal{S}$,
+    \begin{align*}
+        v_{\pi'}(s) &= \max_{a}\E[R_{t+1} + \gamma v_{\pi'}(S_{t+1})| S_t=s, A_t=a] \\
+        &= \max_{a}\sum_{s',r}p(s',r|s,a)[r + \gamma v_{\pi'}(s')].
+    \end{align*}
+    And this is same as the Bellman optimal equation, and $v_{\pi'}$ must be $v_*$, the optimal value function, and so is $v_\pi$.
+
+\section{Obtaining Optimal Policy}
+    \subsection{Policy Iteration}
+        Now, we can repeat the above two processes, policy evaluation and policy improvement, to obtain the optimal policy and optimal state-value function.
+        Specifically, we start with initial policy $\pi_0$ and evaluate the state-value function $v_{\pi_0}$.
+        Then we improve policy $\pi_0$ with $v_{\pi_0}$ to get $\pi_1$, and evaluate next state-value function $v_{\pi_1}$. And we repeat it until we get $\pi_*$ and $v_*$.
+        
+        This way of finding optimal policy is called \emph{policy iteration}.
+
+        Since the finite MDP has only finite number of policies, this process must converge to an optimal policy in finite number of iterations.
+        
+        \Algorithm{policyIter}
+        {Policy Iteration (with iterative policy evaluation)}
+        {\inputitem{$p(s',r|s,a)$}{the dynamics of given finite MDP} \\
+        \inputitem{$\pi$}{initial policy} \\
+        \inputitem{$v$}{initial state-value function}}
+        {\inputitem{$\pi_*$}{optimal policy}\\
+        \inputitem{$v_*$}{optimal state-value function}}
+        {
+            $\theta \leftarrow \text{appropriate threshold value for convergence}$\;
+            $\Delta \leftarrow 0$\;
+            $\text{\emph{policy-stable}} \leftarrow \text{false}$\;
+            \Repeat{\emph{policy-stable} is true and $\max{|V_{old}(s) - V(s)|} < \theta$}
+            {
+                \tcp{Policy Evaluation}
+                \Repeat{$\Delta < \theta$}
+                {
+                $\Delta \leftarrow 0$\;
+                $V_{old}(s) \leftarrow V(s)$\;
+                \ForEach{$s \in \mathcal{S}$}
+                {
+                    $v \leftarrow V(s)$\;
+                    $V(s) \leftarrow \sum_{a}\pi(a|s)\sum_{s',r}p(s',r|s,a)[r + \gamma V(s')]$\;
+                    $\Delta \leftarrow \max(\Delta, |v-V(s)|)$\;
+                }
+                }
+                \tcp{Policy Improvement}
+                $\text{\emph{policy-stable}} \leftarrow \text{true}$\;
+                \ForEach{$s \in \mathcal{S}$}
+                {
+                    $\pi'(s) \leftarrow \pi(s)$\;
+                    $\pi(s) \leftarrow \arg\max_{a \in \mathcal{A}(s)} \sum_{s',r}p(s',r|s,a)[r + \gamma V(s')]$\;
+                    \If{$\pi'(s) \neq \pi(s)$}
+                    {
+                        $\text{\emph{policy-stable}} \leftarrow \text{false}$\;
+                    }
+                }
+            }
+        }
+
+    \subsection{Value Iteration}
+        One drawback of policy iteration is that it involves policy evaluation, which may take a long time if the state space is too large.
+        The good news is that the policy evaluation step in policy iteration can be truncated in several ways,
+        without losing a convergence guarantees of policy iteration. One of such a way is \emph{value iteration}.
+        The value iteration combines policy improvement and truncated policy evaluation steps;
+        \begin{align}
+            v_{k+1} &= \max_{a}\E[R_{t+1} + \gamma v_k(S_{t+1})|S_t=s,A_t=a] \\
+            &=\max_{a}\sum_{s',r}p(s',r|s,a)[r+ \gamma v_k(s')]
+        \end{align}
+        The sequence $\{v_k\}$ is known to converge to $v_*$.
+        
+        \Algorithm{valIter}
+        {Value Iteration}
+        {\inputitem{$p(s',r|s,a)$}{the dynamics of given finite MDP} \\
+        \inputitem{$V(s)$}{initia value function, except that $V(terminal)=0$}}
+        {\inputitem{$\pi$}{final policy}}
+        {
+            $\theta \leftarrow \text{appropriate threshold value}$\;
+            \Repeat{$\Delta < \theta$}
+            {
+                $\Delta \leftarrow 0$\;
+                \ForEach{$s \in \mathcal{S}$}
+                {
+                    $v \leftarrow V(s)$\;
+                    $V(s) \leftarrow \max_a \sum_{s',r}p(s',r|s,a)[r + \gamma V(s')]$\;
+                    $\Delta \leftarrow \max(\Delta, |v - V(s)|)$\;
+                }
+            }
+            \ForEach{$s \in \mathcal{S}$}
+            {
+                $\pi(s) \leftarrow \arg\max_a \sum_{s',r}p(s',r|s,a)[r + \gamma V(s')]$\;
+            }
+            \Return{$\pi$}
+        }
+        Faster convergence can often be achieved by interposing multiple policy evaluation sweeps between each policy improvement step.
+
+\section{Asynchronous Dynammic Programming}
+    As one can see, the DP methods requires a sweep along the state space for oplicy evaluation. This can be expensive, if the given state space
+    is too large.
+    
+    \textbf{Asynchronous DP} algorithms do not sweep along the state space. The values are updated without any order in this algorithms, and even some
+    states can be updated multiple times while other states are not. However, it cannot ignore the states; for the asynchronous DP algorithms to converge,
+    they must visit all states.
+
+    The point is that we do not have to wait for policy evaluation step to finish. We can improve our policy without sweeping a state space for
+    policy evaluation. We might even try to skip updating some states if it is unrelevant to optima behavior.
+
+    Asynchronous DP algorithms can easily be mixed up with real-time interaction.
+
+\section{Generalized Policy Iteration}
+    Policy iteration involves two simultaneous interacting processes, the policy evaluation and policy improvement. In policy iteration method,
+    these two processes wait each other to be finished. But, this is not neccessary, and the example of it is the value iteration.
+    In asynchronous DP algorithms, these two processes intervene in mush finer manner. We use the term \textbf{general policy iteration} to denote
+    the general idea of letting policy evaluation and improvement processes interact. 
+\end{document}

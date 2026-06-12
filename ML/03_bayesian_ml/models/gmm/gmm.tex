@@ -1,0 +1,106 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Gaussian Mixture Model}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    This document explains \textbf{Gaussian mixture model} (GMM), which is literally a mixture of Gaussian distribution.
+    GMM is mainly used for clustering like k-means clustering, but the main difference is that it provides us the probability of being member of each clusters.
+
+\section{Main Idea}
+    \subsection{Introduction}
+        Gaussian mixture model can be simply illustrated as a linear superposition of Gaussian distributions;
+        \[
+        p(\textbf{x})=\sum_{k=1}^{K}\pi_k\mathcal{N}(\textbf{x}|\bm\mu_k, \bm\Sigma_k),\ 
+        \text{where $0 \leq \pi_k \leq 1$ and $\sum_{k=1}^{K}\pi_k = 1$}.
+        \]
+        However, the GMM can be expressed in terms of discrete \emph{latent variables}, and its more useful when interpreted in this way.
+    \subsection{Latent Variable}
+        \begin{defn}{Gaussian Mixture Model}{gaussMixMod}
+            Let \textbf{z} be a $K$-dimensional binary random variable having 1-of-$K$ representation i.e.,
+            $z_k \in \{0,1\}$ and $\sum_k z_k=1$. If the random variable \textbf{x} have conditional probability distribution
+            \[
+            p(\mathbf{x}|z_k=1) = \mathcal{N}(\mathbf{x}|\bm\mu_k,\bm\Sigma_k)
+            \]
+            with
+            \[
+            p(z_k=1)=\pi_k,\text{ where } 0 \leq \pi_k \leq 1 \text{ and } \sum_{k=1}^{K}\pi_k=1
+            \]
+            \textbf{x} follows mixture of Gaussians.
+        \end{defn}
+
+        We can derive the linear superposition representation of Definition \ref{defn:gaussMixMod} when we calculate the marginal distribution $p(\textbf{x})$.
+        The advantage of this representation is that we can directly work with joint distribution $p(\textbf{x}, \textbf{z})$, and we can evaluate the \emph{responsibility} $\gamma(z_{nk})$ of 
+        each latent variable $z_k$ about data point $\textbf{x}_n$, which is defined as
+        \begin{align*}
+        \gamma(z_{nk})&=p(z_k=1|\textbf{x}_n) \\
+        &=\frac{p(z_k=1)p(\textbf{x}_n|z_k=1)}{\sum_{j=1}^{K}p(z_j=1)p(\textbf{x}_n|z_j=1)} \\
+        &=\frac{\pi_k\mathcal{N}(\textbf{x}_n|\bm\mu_k,\bm\Sigma_k)}{\sum_{j=1}^{K}\mathcal{N}(\textbf{x}_n|\bm\mu_j,\bm\Sigma_j)}
+        \end{align*}
+    
+    \subsection{Likelihood Function}
+        The likelihood function of a mixture of Gaussians is given as following:
+        \begin{thm}{Likelihood Function of GMM}{likeliGMM}
+            Let \textbf{X} be a given data set in which the $n$-th row is given by $\textbf{x}_n^{\top}$. Using the notations of Definition \ref{defn:gaussMixMod}, the log-likelihood is given as
+            \[
+            \log{p(\textbf{X}|\bm\pi,\bm\mu,\bm\Sigma)}=\sum_{n=1}^{N}\log{\left\{ \sum_{k=1}^{K}\pi_k\mathcal{N}(\textbf{x}_n|\bm\mu_k,\bm\Sigma_k) \right\}}
+            \]
+        \end{thm}
+        The maximum likelihood, unlike simple Gaussian model, cannot be expressed in closed form. To maximize the log-likelihood function, we can use \textbf{EM} algorithm, which is usedful for
+        optimization with latent variables. General EM algorithm explanation is given in this \href{run:../../inference/em_algorithm/em_algorithm.pdf}{document}.
+
+        Before discussing about the EM algorithm for GMM, we show that there is a problem with the maximum likelihood framework when it is applied to GMM.
+        Suppose that the $j$-th component $\bm\mu_j$ of $\bm\mu$ exactly equal to one of the data points, i.e., $\bm\mu_j=\textbf{x}_n$ for some $n$. Then, the
+        likelihood of the GMM will diverge to infinity, since assuming that the variance is isotropic,
+        $\mathcal{N}(\textbf{x}_n|\bm\mu_j, \sigma_j^2\textbf{I})=\frac{1}{\sqrt{2\pi}\sigma_j} \rightarrow \infty$ as $\sigma_j \rightarrow 0$, when maximizing
+        likelihood. This can be resolved heuristically by detecting when a Gaussian component is collapsing, and then randomly assigning values to mean and resetting variance to some large value.
+        Or we can set the prior on parameters and try to get MAP estimate instead of MLE.
+
+    \subsection{EM algorithm for GMM}
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{EM algorithm for a Gaussian mixture model}
+
+            \Input{initial model parameters $\{\bm\mu_k\},\{\bm\Sigma_k\},\{\pi_k\}$ \newline
+            data set $\{\textbf{x}_1,\dots,\textbf{x}_n\}$}
+            \Output{final model parameters $\{\bm\mu_k\},\{\bm\Sigma_k\},\{\pi_k\}$}
+
+            \BlankLine
+            \hrule
+
+            \Repeat{convergence}
+            {
+                \tcp{E step}
+                \For{$n \in \{1,\dots,N\}$}
+                {
+                    \For{$k \in \{1,\dots,K\}$}
+                    {
+                        $\gamma(z_{nk}) \leftarrow \dfrac{\pi_k\mathcal{N}(\textbf{x}_n|\bm\mu_k,\bm\Sigma_k)}{\sum_{j=1}^{K}\pi_j\mathcal{N}(\textbf{x}_n|\bm\mu_j,\bm\Sigma_j)}$\;
+                    }
+                }
+                \tcp{M step}
+                \For{$k \in \{1,\dots,K\}$}
+                {
+                    $N_k \leftarrow \sum_{n=1}^{N}\gamma(z_{nk})$\;
+                    $\bm\mu_k \leftarrow \frac{1}{N_k}\sum_{n=1}^{N}\gamma(z_{nk})\textbf{x}_n$\;
+                    $\bm\Sigma_k \leftarrow \frac{1}{N_k}\sum_{n=1}^{N}\gamma(z_{nk})(\textbf{x}_n-\bm\mu_k)(\textbf x_n-\bm\mu_k)^{\top}$\;
+                    $\pi_k \leftarrow \frac{N_k}{N}$\;
+                }
+                \tcp{log likelihood}
+                $\mathcal{L} \leftarrow \sum_{n=1}^{N}\log{\left\{ \sum_{k=1}^{K}\pi_k\mathcal{N}(\textbf{x}_n|\bm\mu_k,\bm\Sigma_k) \right\}}$\;
+            }
+            \Return{$\{\bm\mu_k\},\{\bm\Sigma_k\},\{\pi_k\}$}
+
+        \end{algorithm}
+\end{document}

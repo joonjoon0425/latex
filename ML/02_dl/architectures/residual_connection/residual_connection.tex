@@ -1,0 +1,206 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Residual Connections}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    We introduce \textbf{residual network}, which enables us to use deep networks, with \textbf{batch normalization}.
+    Batch normalization is explained in \href{run:../../_common/normalization/normalization.pdf}{the other document}.
+
+\section{Main Ideas}
+    The residual network was introduced to solve the vanishing gradient problem. Ordinary sequential network,
+    without residual connection, the autocorrelation function of the gradient shows that nearby gradients are
+    no so correlated as the layer gets deeper. This means that a subtle change in gradient value leads to tremendous
+    change in the output result. This is termed \textbf{shattered gradients} phenomenon.
+
+    \subsection{Residual Connection}
+        \textbf{Residual connection} is to simply make the network to learn the residual instead of the objective itself.
+        To accomplish this, we just add the input to the output value.
+
+        For example, let's assume that we have following network layer:
+        \begin{align}
+            \textbf{h}_1 &= \textbf{f}_1[\textbf{x}] \\
+            \textbf{h}_2 &= \textbf{f}_2[\textbf{h}_1] \\
+            \textbf{y} &= \textbf{f}_3[\textbf{h}_2]
+        \end{align}
+        This is the ordinary sequential network.
+        Now, we add the input to the output.
+        \begin{align}
+            \textbf{h}_1 &= \textbf{x} + \textbf{f}_1[\textbf{x}] \\
+            \textbf{h}_2 &= \textbf{h}_1 + \textbf{f}_2[\textbf{h}_1] \\
+            \textbf{y} &= \textbf{h}_2 + \textbf{f}_3[\textbf{h}_2]
+        \end{align}
+        
+        We can interpret the residual connection in two different ways:
+        \begin{enumerate}
+            \item Ensemble: If we expand the network, we can see that the whole network is some kind of ensemble of 
+                small networks:
+                \begin{align}
+                \textbf{y} = \textbf{x} &+ \textbf{f}_1[\textbf{x}] \\
+                &+\textbf{f}_2[\textbf{x} + \textbf{f}_1[\textbf{x}]] \\
+                &+\textbf{f}_3[\textbf{x} + \textbf{f}_1[\textbf{x}] + \textbf{f}_2[\textbf{x} + \textbf{f}_1[\textbf{x}]]]
+                \end{align}
+            \item Various Connection from input to output:
+                Since there are various connection from input to output,
+                the vanishing gradient problem is relaxed.
+                You can see that the gradient of \textbf{y} about $\textbf{h}_3$ is $\textbf{I} + \partial\textbf{f}_4$,
+                and the $\textbf{I}$ prevents the vanishing gradient problem. 
+        \end{enumerate}
+
+        \subsubsection{Order of Operations}
+            If we apply ReLU at the end of the network, the residual connection will always add the positive value to the input value.
+            To prevent this, we place ReLU at the front of the network and then apply residual connection.
+            But, the ReLU ignores all negative values, so we first apply linear layer, and then apply ReLU for the
+            first residual block, and apply ReLU first for other residual blocks.
+
+        \subsubsection{Matching the Dimensions}
+            The residual connection is possible only when the dimensions of the input and output matches.
+            If the dimensions are different, we can apply projection operation and make residual connection.
+        
+    \subsection{Exploding Gradients}
+        The residual connection solves vanishing gradient problem, but cannot solve exploding gradient problem.
+        Even the He initialization cannot resolve the exploding gradient problem in residual network.
+        We use batch normalization to deal with this problem.
+
+        The benefits of batch normalization with residual network is presented.
+        \begin{enumerate}
+            \item \textbf{Stable Forward Propagation}: Residual network without batch normalization has variance of the hidden units
+                increasing exponentialy. With batch normalization, the variance increases linearly, and even this can be resolved
+                by tuning the mean and standard deviation used in batch normalization.
+            \item \textbf{Higher Learning Rates}: Empirical studies and theory both show that batch normalization
+                smoothens the loss surface. This means we can use higher learning rates.
+            \item \textbf{Regularization}: Since the batch normalization uses batch dataset, this injects noise to the network
+                (since the statistics are different for each batches),
+                which has the effect of regularization.
+        \end{enumerate}
+
+\section{Extensions of Residual Connection}
+    \subsection{Neural ODE}
+        The residual connection follows the equation when applied: $\tb z^{(t + 1)} = z^{(t)} + \tb f(\tb z^{(t), \tb w})$.
+        If we increase the number of residual layers infinitely, we can represent the vector $\tb z^{(t)}$ as a continuous function of $t$,
+        satisfying following equation:
+        \[
+        \frac{d\tb z(t)}{dt} = \tb f(\tb z(t),\tb w)
+        \]
+        We can evaluate this by using ODE solver, such as RK method or Euler's forward integration method.
+        \subsubsection{Training Neural ODE}
+            Suppose that we are given the input vector $\tb z(0)$, and the loss functions depend on $\tb z(T)$, the output vector.
+            To apply backpropagation to neural ODE, we first define a quantity called \textbf{adjoint}.
+            \begin{defn}{Adjoint}{adjoint}
+                Let $\tb z(t)$ denote the continuous layer given as $\frac{d\tb z(t)}{dt}=\tb f(\tb z(t), \tb w)$,
+                and let $L$ denote the loss function.
+                We define \textbf{adjoint} $\tb a(t)$ as
+                \[
+                \tb a(t)=\frac{dL}{d\tb z(t)}
+                \]
+            \end{defn}
+        Notice that $\tb a(T)$ corresponds to the usual derivative of the loss with respect to the output vector.
+        The adjoint satisfies its own differential equation:
+        \[
+        \frac{d\tb a(t)}{dt}=-\tb a(t)\nabla_{\tb z}\tb f(\tb z(t), \tb w)
+        \]
+        \begin{proof}
+            The following holds for arbitrary $dt$: $\tb z(t + dt) = \tb z(t) + \tb f(\tb z(t), \tb w)dt + \bm\epsilon_z$
+            where $\lim_{dt \to 0}\frac{\|\bm\epsilon_z\|}{dt} = 0$. Similar equation hols for the adjoint $\tb a(t)$,
+            $\tb a(t + dt)=\tb a(t) + \frac{d\tb a(t)}{dt}dt + \bm\epsilon_a$ where $\lim_{dt \to 0}\frac{\|\bm\epsilon_a\|}{dt} = 0$.
+            The following holds due to the chain rule:
+            \[
+            \tb a(t) = \frac{dL}{d\tb z(t)} = \frac{dL}{d\tb z(t + dt)}\frac{d\tb z(t + dt)}{d\tb z(t)}
+            \]
+            Note that $\tb a(t + dt) = \frac{dL}{d\tb z(t+dt)}$. Then,
+            \begin{align*}
+                \tb a(t) &= \tb a(t + dt)\frac{d\tb z(t + dt)}{d\tb z(t)} \\
+                &= \tb a(t + dt)\left( \tb I + \frac{d\tb f(\tb z(t), \tb w)}{d\tb z(t)}dt + \frac{d\bm\epsilon_z}{d\tb z(t)} \right)
+            \end{align*}
+            Using the equation $\tb a(t + dt)=\tb a(t) + \frac{d\tb a(t)}{dt} + \bm\epsilon_a$,
+            we get
+            \begin{align*}
+                \frac{d\tb a(t)}{dt} + \frac{\bm\epsilon_a}{dt} =
+                -\tb a(t + dt)\frac{d\tb f(\tb z(t),\tb w)}{d\tb z(t)}
+                - \tb a(t+dt)\frac{d\bm\epsilon_z}{d\tb z(t)}\frac{1}{dt}
+            \end{align*}
+            As $dt \to 0$, the equation goes to
+            \[
+                \frac{d\tb a(t)}{dt} = -\tb a(t)\frac{d\tb f(\tb z(t),\tb w)}{d\tb z(t)}
+            \]
+        \end{proof}
+
+        Now we evaluate the derivatives of the loss with respect to network parameters.
+        \begin{thm}{Gradient of Loss Function about Parameter}{gradLossFuncParam}
+            Let $\tb a(t)$ be the adjoint and let L be the loss function. Then, the following equation holds;
+            \[\frac{dL}{d\tb w}=\int_{t_0}^{T}\tb a(t)\frac{d\tb f(\tb z(t), \tb w)}{d\tb w}dt\]
+        \end{thm}
+        \begin{proof}
+            Following holds since $\frac{d\tb z(t)}{dt} = \tb f(\tb z(t), \tb w)$
+            \[
+            \mathcal{L} = L(\tb z(T)) - \int_{t_0}^{T}\tb a(t)\left( \frac{d\tb z(t)}{dt} - \tb f(\tb z(t), \tb w) \right)dt.
+            \]
+            We use integration by parts and derive the following equation:
+            \[
+            \int_{t_0}^{T}\tb a(t)\frac{d\tb z(t)}{dt}dt = \big[\tb a(t)\tb z(t)\big]_{t_0}^{T} - \int_{t_0}^{T}\frac{d\tb a(t)}{dt}\tb z(t)dt.
+            \]
+            We substitute this at the original equation and obtain
+            \[
+            \mathcal{L} = L(\tb z(T)) -\tb a(T)\tb z(T) + \tb a(t_0)\tb z(t_0)
+            + \int_{t_0}^{T}\left( \frac{d\tb a(t)}{dt}\tb z(t) + \tb a(t)\tb f(\tb z(t),\tb w) \right)dt.
+            \]
+            We now differentiate the equation about $\tb w$.
+            \[
+            \frac{d\mathcal{L}}{d\tb w}=\left( \frac{dL}{d\tb z(T)} - \tb a(T)\right)\frac{d\tb z(T)}{d\tb w} + \tb a(t_0)\frac{d\tb z(t_0)}{d\tb w}
+            + \int_{t_0}^{T}\left\{ \left( \frac{d\tb a(t)}{dt} + \tb a(t)\frac{d\tb f(\tb z(t),\tb w)}{d\tb z(t)} \right)\frac{d\tb z(t)}{d\tb w} + \tb a(t)\frac{d\tb f(\tb z(t),\tb w)}{d\tb w} \right\}dt
+            \]
+            Since these equation are satisfied about any $\tb a(t)$, we can substitute $\tb a(t)$ with the adjoint. Then, we get
+            \[
+            \frac{dL}{d\tb w}=\frac{d\mathcal{L}}{d\tb w}=\int_{t_0}^{T}\tb a(t)\frac{d\tb f(\tb z(t), \tb w)}{d\tb w}dt
+            \]
+
+        \end{proof}
+        So, actually the adjoint is originaly created from the idea of Lagrange multiplier.
+
+        The benefit of neural ODE using adjoint method is that there is no need to store the intermediate results of the forward propagation, which
+        leads to constant memory cost.
+        
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{Neural ODE training algorithm}
+
+            \Input{Neural ODE $\frac{{d\tb z(t)}}{dt} = \tb f(\tb z(t),\tb w)$ \newline
+            loss function $L(\cdot, \cdot)$ \newline
+            input data $\tb z(0)$ \newline
+            correct answer $\tb z'$ \newline
+            learning rate $\eta$}
+            \Output{empty}
+
+            \BlankLine
+            \hrule
+            \tcp{forward pass}
+            $\tb z(T) \leftarrow \text{ODE Solver}_{0 \to T}[\frac{{d\tb z(t)}}{dt} = \tb f(\tb z(t),\tb w)](\tb z(0))$\;
+            $L \leftarrow L(\tb z(T), \tb z')$\;
+
+            \tcp{backward pass}
+            $\begin{bmatrix}
+                \tb z(0) \\
+                \tb a(0) \\
+                \tb a_{\tb w}(0)
+            \end{bmatrix}
+            \leftarrow \text{ODE Solver}_{T \to 0}\left[
+                \frac{d}{dt}\begin{bmatrix} \tb z(t) \\ \tb a(t) \\ \tb a_{\tb w}(t) \end{bmatrix}
+                = \begin{bmatrix} \tb f(\tb z(t), \tb w ) \\ -\tb a(t)\frac{d\tb f(\tb z(t), \tb w)}{d\tb z(t)} \\ -\tb a(t)\frac{d\tb f(\tb z(t),\tb w)}{d\tb w}\end{bmatrix}
+                \right]\left(\begin{bmatrix} \tb z(T) \\ \frac{dL}{d\tb z(T)} \\ 0 \end{bmatrix}\right)$\;
+            \tcp{Update}
+            $\tb w \leftarrow \tb w - \eta \tb a_{\tb w}(0)$\;
+        \end{algorithm}
+
+        Since the intermediate values are not saved, we re-calculate the intermediate values during backpropagation.
+\end{document}

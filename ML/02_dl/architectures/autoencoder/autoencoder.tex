@@ -1,0 +1,189 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Autoencoder}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    \textbf{Autoencoder} produces outputs that are similar to input data. It first maps the input $x$ to
+    a hidden representation $z(x)$ and produce the output $y(z)$ which reserves the original data $x$ well.
+    This can be seen as two parts, \emph{encoder} and \emph{decoder}. Encoder can later be used at dimensionality reduction.
+    To inhibit autoendcoder from generating trivial solution, we give some constraints, such as restricting the
+    dimension of hidden representation or make it to have sparse representation.
+
+\section{Deterministic Autoencoder}
+    \subsection{Deep Autoencoder}
+        \begin{defn}{Deep Autoencoder}{deepAutoenc}
+            Let $\{\tb x_n\} \in \mathbb{R}^D$ be a given data, and let $\tb{y}(\tb x, \tb w) : \mathbb{R}^D \to \mathbb{R}^D$
+            be a deep network function with parameter $\tb w$ having bottleneck.
+            Then, the \textbf{deep autoencoder} minizes the reconstruction error:
+            \[
+            E(\tb w)=\sum_{n=1}^{N}\|\tb{y}(\tb x_n, \tb w) - \tb x_n\|^2
+            \]
+        \end{defn}
+        Usually the network $\tb y(\tb x, \tb w)$ decrease the dimensionality and then increase dimensionality of hidden units to stop autoencoder from learning
+        trivial representations, which is called bottleneck.
+    \subsection{Sparse Autoencoder}
+        Instead of making bottleneck like deep autoencoder, we can use regularizer so that the internal representation have a sparse representation.
+        This method have an effect of inducing the effective dimensionality of internal representation.
+        One simple choice of sparse regularizer is L1 regularizer, 
+        \begin{defn}{Sparse Autoencoder with L1 Regularizer}{sparseAutoenc}
+            Let $\{\tb x_n\} \in \mathbb{R}^D$ be a given data, and let $\tb{y}(\tb x, \tb w) : \mathbb{R}^D \to \mathbb{R}^D$
+            be a deep network function with parameter $\tb w$.
+            Then, the \textbf{sparse autoencoder} minimizes the reconstruction error with L1 regularizer:
+            \[
+            E(\tb w)=\sum_{n=1}^{N}\|\tb{y}(\tb x_n, \tb w) - \tb x_n\|^2 + \lambda\sum_{k=1}^{K}|z_k|
+            \]
+            where $z_k$ are the appropriate hidden units according to the internal representation.
+        \end{defn}
+    \subsection{Denoising Autoencoder}
+        Another constraint is to corrupt the given data. Then the autoencoder will have ability to denoise the corrupted data.
+        \begin{defn}{Denoising Autoencoder}{denoisAutoenc}
+            Let $\{\tb x_n\} \in \mathbb{R}^D$ be a given data, and let $\tb{y}(\tb x, \tb w) : \mathbb{R}^D \to \mathbb{R}^D$
+            be a deep network function with parameter $\tb w$.
+            Then, the \textbf{denoising autoencoder} minizes the following error function:
+            \[
+            E(\tb w)=\sum_{n=1}^{N}\|\tb{y}(\tilde{\tb x}_n, \tb w) - \tb x_n\|^2
+            \]
+            where $\tilde{\tb x}_n$ are corrupted dataset. 
+        \end{defn}
+        The denoising autoencoder's training is related to score mathcing where the score is defined as $\tb s = \nabla_{\tb x}\log{p(\tb x)}$.
+        The autoencoder learns to reverse the corruption, and the score vector $\nabla\log{p(x)}$ points towards high data density,
+        These two methods are similar and have deep relationship.
+    \subsection{Masked Autoencoder}
+        The transformer models such as BERT are trained by masking the random subsets of input texts, and this can be applied to autoencoder models, too.
+        This is usually combined with transformer models to create a vision transformer architecture.
+        Then the autoencoder trains to predict the deleted pixels, inferencing with leftover pixels.
+
+\section{Variational Autoencoder}
+    \subsection{Introduction}
+        The \textbf{variational autoencoder}, unlike deterministic autoencoder, does not fix the internal representation, but allow some uncertainty
+        of internal representation. However, the likelihood defined by a neural network make the training and inference intractable.
+        Variational autoencoder resolve this problem by using \emph{variational inference} technique, approximating the likelihood function with a
+        feasible function.
+    \subsection{Amortized Inference}
+        Consider a generative model with latent variable having distribution $p(\tb z)=\mathcal{N}(\tb z|\tb 0, \tb I)$.
+        We can make a network that creates data from latent variables: $\tb g(\tb z,\tb w)$. And we can model a probability distribution with network $\tb g$,
+        for example, a Gaussian distribution $p(\tb x|\tb z, \tb w) = \mathcal{N}(\tb x|\tb g(\tb z,\tb w), \tb I)$.
+        
+        Now we derive the ELBO of variational autoencoder.
+        The log-likelihood of data $\tb x$ is:
+        \[
+        \log{p(\tb x| \tb w)=\mathcal{L}(\tb w)+\text{KL}(q(\tb z )\|p(\tb z|\tb x, \tb w))}
+        \]
+        where $\mathcal{L}(\tb w)$ is the evidence lower bound,
+        \[
+        \mathcal{L}(\tb w)=\int q(\tb z)\log{\left\{\frac{p(\tb x|\tb z, \tb w)p(\tb z)}{q(\tb z)}\right\}}d\tb z
+        \]
+        and
+        \[
+        \text{KL}(q(\tb z) \| p(\tb z|\tb x,\tb w))=-\int q(\tb z)\log{\left\{ \frac{p(\tb z|\tb x,\tb w)}{q(\tb z)} \right\}}d\tb z.
+        \]
+        The difference from GMM or pPCA is that the E step is infeasible, since the exact posterior distribution requires the
+        likelihood $p(\tb x|\tb w)$, which is intractable:
+        \[
+        p(\tb z|\tb x, \tb w)=\frac{p(\tb x|\tb z, \tb w)p(\tb z)}{p(\tb x|\tb w)}
+        \]
+        The solution is to approximate the posterior distribution $p(\tb z|\tb x, \tb w)$,
+        with another network $q(\tb z|\tb x, \bm\phi)$, called the \emph{encoder network}.
+        The original network then can be called as \emph{decoder network}.
+
+        A typical choice for the encoder network is a Guassian ditribution with mean and variance given by the function that takes $\tb x$ as input;
+        \[
+        q(\tb z|\tb x,\bm\phi)=\prod_{j=1}^{M}\mathcal{N}(z_j|\mu_j(\tb x,\bm\phi), \sigma^2_j(\tb x,\bm\phi))
+        \]
+        The E step now coressponds to updating $\bm\phi$ and M step corresponds to updating $\tb w$. Notice that the E step does not in general reduce the
+        KL divergence to zero, since it is just an approximation.
+    \subsection{Reparametrization Trick}
+        Now, we introduce the \textbf{reparametrization trick}. The lower bound $\mathcal{L}(\tb w)$ is still intractable since it involves integrals over the latent
+        variables $\{\tb z_n\}$:
+        \begin{align*}
+            \mathcal{L}(\tb w,\bm\phi)&=\int q(\tb z|\tb x, \bm\phi)\log{\left\{ \frac{p(\tb x|\tb z, \tb w)p(\tb z)}{q(\tb z|\tb x, \bm\phi)} \right\}}d\tb z
+            \\ &=\int q(\tb z|\tb x,\bm\phi)\log{p(\tb x|\tb z,\tb w)}d\tb z - \text{KL}(q(\tb z|\tb x,\bm\phi)\|p(\tb z))
+        \end{align*}
+        The first term is called \emph{reconstruction error}, since it can be seen as expectation of likelihood of $x$ about latent variable created from given data $x$.
+        The second term, is called regularization term, and can be evaluated analytically:
+        \[
+        \text{KL}(q(\tb z|\tb x,\bm\phi)\|p(\tb z))=\frac{1}{2}\sum_{j=1}^{M}\{1+\log{\sigma^2_j(\tb x, \bm\phi)}-\mu^2_j(\tb x,\bm\phi)-\sigma^2_j(\tb x,\bm\phi)\}
+        \]
+        The leftover term can be approximated by simple Monte Carlo estimator:
+        \[
+        \int q(\tb z|\tb x,\bm\phi)\log{p(\tb x|\tb z,\tb w)}d\tb z \simeq \frac{1}{L}\sum_{l=1}^{L}\log{p(\tb x|\tb z^{(l)}, \tb w)}
+        \]
+        where $\{\tb z^{(l)}\}$ are samples drawn from the encoder distribution $q(\tb z|\tb x, \bm\phi)$. The problem is that the samples are fixed.
+        The change in parameter $\bm\phi$ will change the distribution where the samples are sampled from, but the sample stays fixed.
+        To resolve this, we use reparametrization trick. Instead of sampling directly from $q(\tb z|\tb x,\bm\phi)$, we use
+        that $\tb z_j = \sigma_j\epsilon + \mu_j$ where $\epsilon \sim \mathcal{N}(0,1)$ has Guassian distribution with
+        mean $\mu_j$ and variance $\sigma_j^2$, and sample $\epsilon \sim \mathcal{N}(0,1)$ to create samples $\tb z^{(l)}$.
+        This makes the dependence on $\bm\phi$ explicit and allow us to use gradient descent methods.
+    \subsection{Algorithm}
+        The training of VAE must be balanced over two terms, the reconstruction error and KL divergence.
+        
+        \begin{algorithm}[H]\label{alg:VAEtrain}
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+            
+            \caption{Variational autoencoder training algorithm}
+
+            \Input{dataset $\data = \{\tb x_1,\dots,\tb x_N\}$ \newline
+            encoder network $q(\tb z|\tb x,\bm\phi)=\prod_{j=1}^{M}\mathcal{N}(z_j|\mu_j(\tb x,\bm\phi),\sigma^2_j(\tb x,\bm\phi))$ \newline
+            decoder network $\tb g(\tb z, \tb w)$ \newline
+            initial weight vectors $\tb w$, $\bm\phi$ \newline
+            learning rate $\eta$}
+            \Output{final weight vectors $\tb w$, $\bm\phi$}
+
+            \BlankLine
+            \hrule
+
+            \Repeat{convergence}
+            {
+                \For{$n \in$ mini-batches of data}
+                {
+                    $\mathcal{L} \leftarrow 0$\;
+                    \For{$j \in \{1,\dots,M\}$}
+                    {
+                        $\epsilon_{nj} \leftarrow \mathcal{N}(0,1)$\;
+                        $z_{nj} \leftarrow \mu_j(\tb x_n, \bm\phi) + \sigma_j(\tb x_n,\bm\phi)\epsilon_{nj}$\;
+                        $\mathcal{L} \leftarrow \mathcal{L} + \frac{1}{2}\{1+\log{\sigma^2_j(\tb x_n,\bm\phi)-\mu_j^2(\tb x_n,\bm\phi)-\sigma^2_j(\tb x_n,\bm\phi)}\}$\;
+                    }
+                    $\mathcal{L} \leftarrow \mathcal{L} + \log{p(\tb x_n|\tb z_n,\tb w)}$\;
+                    $\tb w \leftarrow \tb w + \eta\nabla_{\tb w}\mathcal{L}$\;
+                    $\bm\phi \leftarrow \bm\phi + \eta\nabla_{\bm\phi}\mathcal{L}$\;
+                }
+            }
+            \Return{$\tb w$, $\bm\phi$}
+        \end{algorithm}
+        The decoder network $\tb g(\tb z, \tb w)$ is inherent in $p(\tb x|\tb z,\tb w)$. For example, when the variables are continuous, $p(\tb x|\tb z, \tb w)=\mathcal{N}(\tb g(\tb z, \tb w), \tb I)$
+        
+        \subsubsection{Posterior Collapse and Holes in Latent Space}
+            The VAE training algorithm, Algorithm \ref{alg:VAEtrain} has a problem called \textbf{posterior collapse}.
+            When the variational distribution $q(\tb z|\tb x, \tb w)$ converges to the prior distribution $p(z)$ and ignores $\tb x$, leading to poor reconstruction result.
+            This happens because the second term in equation
+            \begin{align*}
+                \mathcal{L}(\tb w,\bm\phi)&=\int q(\tb z|\tb x, \bm\phi)\log{\left\{ \frac{p(\tb x|\tb z, \tb w)p(\tb z)}{q(\tb z|\tb x, \bm\phi)} \right\}}d\tb z
+                \\ &=\int q(\tb z|\tb x,\bm\phi)\log{p(\tb x|\tb z,\tb w)}d\tb z - \text{KL}(q(\tb z|\tb x,\bm\phi)\|p(\tb z)),
+            \end{align*}
+            the KL divergence term, encourage $q(\tb z|\tb x, \tb w)$ to be close to the prior $p(\tb z)$. Thus the posterior collapse can happen when the KL divergence term is relatively closer to zero 
+            than the reconstruction term.
+            
+            Different problem can happen when the latent code is not compressed well. When the latent code is not compressed and therefore is very different from prior,
+            the reconstruction result may be highly accurate, but the samples from prior won't generate realistic outupts. We say that there are \textbf{holes in latent space}.
+            In this case, the KL divergence term would be relatively larger than the reconstruction error.
+        
+        \subsubsection{Solution}
+            We can address both problems by multiplying a coeffiecient $\beta$ in front of reconstruction term, to control the regularization effectiveness of KL divergence term.
+            Typically, $\beta > 1$. If the reconstruction is poor, we increse $\beta$. When the samples are poor, we decrease $\beta$. 
+            Or we can change $\beta$ during training session, by starting with a small value and gradually increasing.
+
+            Another method is to modify the KL divergence term. Wasserstein Autoencoder, VQ-VAE and InfoVAE is the examples of it.
+            
+            \emph{Guess I should study these methods when I build VAE from scratch...}
+\end{document}

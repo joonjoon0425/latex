@@ -1,0 +1,105 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Regularization Methods}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    In this document, we discuss about methods of regularization.
+    Regularization is used to deal with overfitting. There are several methods
+    and these methods can be used together.
+
+\section{Main Ideas}
+    \subsection{Inductive Bias}
+        \textbf{Inductive bias} is a preference for one choice over others. It is also called prior knowledge, literally.
+        Inductive bias helps to constrain the space of solutions. To exploit the inductive bias, we use the following regularization approaches:
+
+    \subsection{Weight Decay}
+        \textbf{Weight decay} is used to control the size of the parameters.
+        It prevents parameters being too large or too small.
+        It is called weight decay, due to the following equation of \textbf{sum-of-squares regularizer}:
+        \[
+        \nabla E(\textbf{w}) + \lambda\textbf{w}.
+        \]
+        The sequential update will lead weights to zero.
+
+        \subsubsection{Generalized Weight Decay}
+        \begin{defn}{Generalized Weight Decay}{GenWeightDecay}
+        A generalized weight decay regularizer is defined as follows:
+        \[
+        \Omega(\textbf{w}) = \frac{\lambda}{2}\sum_{j=1}^{M}\left|w_j\right|^q
+        \]
+        \end{defn}
+        $q=2$ corresponds to the \textbf{L2 regularizer}, and $q=1$ corresponds to the \textbf{L1 regularizer}.
+        The regression with L2 regularizer is called \textbf{ridge regression}, and the one with L1 regularizer is called \textbf{lasso regression}.
+        The lasso regression makes \emph{sparse model}, since the lasso regression drives the coefficients or weights, to zero.
+
+        In the Bayesian perspective, ridge regression and lasso regression is same as setting the prior as
+        Gaussian and Laplace with Gaussian liklihood, respectively.
+
+        \textbf{Elastic net} is regularizer which combines L2 and L1 regularizer;
+        \[
+        \Omega(\textbf{w}) = \frac{\lambda_1}{2}\sum_{j=1}^{M}\left|w_j\right|
+        + \frac{\lambda_2}{2}\sum_{j=1}^{M}\left|w_j\right|^2
+        \]
+
+        \subsubsection{Constant Regularizers}
+        The L2 regularizer and other regularizers, cannot include the inductive bias such as invariance and equivariance in itself.
+        To deal with it, we must treat the weights and biases differently at each deep network layer. This method, which preserves the invariance is called
+        \textbf{constant regularizer}. But this method is not used so much.
+
+    \subsection{Early Stopping}
+        \textbf{Early Stopping}, is to stop the training at the point of smallest error with respect to validation error.
+        Stopping a training before a minimum of the training error has been reached can be understood as limiting the effective network complextity.
+        
+        \subsubsection{Double Descent}
+            However, there is a phenomenon called \textbf{double descent} (Belkin et al., 2019). The validation error decreases first,
+            and increases a bit, then suddenly, it decreases again. This can be understood as the transition of regime;
+            \begin{enumerate}
+                \item Under-parameterized Regime: The complexity of the model is smaller than the number of samples.
+                    The model follows classical bias-variance tradeoff.
+                \item Over-parameterized Regime: The complexity of the model is large enough so that the test error is 0.
+                    In this case, the model's test error decreases as the model's complexity increases.
+            \end{enumerate}
+            For more information, check Nakkiran et al., 2019. This paper tries to explain the double descent with \textbf{effective model complexity},
+            defined as following:
+            \begin{defn}{Effective Model Complexity}{effModelComp}
+                The \textbf{Effective Model Complexity} (EMC) of a trainging procedure $\mathcal{T}$,
+                with respect to distribution $\mathcal{D}$ and parameter $\epsilon > 0$ is defined as:
+                \[
+                \textbf{EMC}_{\mathcal{D},\epsilon}(\mathcal{T})=
+                \max{\{n|\mathbb{E}_{S\sim\mathcal{D}^n}[\text{Error}_S(\mathcal{T}(S))] \leq \epsilon\}}
+                \]
+                where Error$_S(M)$ is the mean error of model $M$ on train samples $S$.
+            \end{defn}
+            (Cannot understand the meaning of it now...)
+
+        
+    \subsection{Parameter Sharing}
+        \textbf{Parameter Sharing} is to group the parameters and let the grouped parameters to have the same value.
+        Parameter sharing is used to encode some invariance or equivariance into a network. CNN is the example of the parameter sharing.
+
+        \subsubsection{Soft Parameter Sharing}
+            Instead of fixing the parameters to share same values, we can encourage the parameters in the same group to have
+            similar values, leading to \textbf{soft parameter sharing}. We can use \emph{mixture of Gaussains} to achieve this.
+
+    \subsection{Dropout}
+        \textbf{Dropout} is to delete the nodes from the network randomly during training. This method can be understood as implicit model averaging.
+        Dropout can be applied to the input and hidden layers, but not the output layers. The probability $p=0.5$ of deleting the node, from the experiences,
+        is known to work well with hidden layers. For the input layer, $p=0.8$ is works well.
+        
+        The dropout should be applied only when the model is being trained. However, there is a method called \textbf{Monte Carlo dropout}, where we
+        still use dropout while inferencing. The Monte Carlo dropout simply make inferences mutiple times and average the results. Averaging 10 to 20 results
+        is known to process good results.
+        Monte Carlo dropout can provide us the uncertainty of the result, since we can check the standard deviation of the model's prediction.
+
+\section{The sections of this note may be created to individual documents later}
+
+\end{document}

@@ -1,0 +1,81 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Normalization Methods}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    We introduce methods of \textbf{normalization}, which helps deep neural network to be trained.
+    Three methods will be discussed: \textbf{Data normalization}, 
+    \textbf{layer normalization} and \textbf{batch normalization}.
+
+\section{Main Ideas}
+    \subsection{Data Normalization}
+        \textbf{Data normalization} is to normalize the test data along mini-batch dataset.
+        Since each feature values are distributed along different ranges,
+        some feature may be ignored, or overemphasized. Normalizing the data solves this probelm, by
+        making all the feature values to have zero mean and unit variance.
+        
+        \emph{My experience about the effect of data normalization:
+        Polynomial regression exploded at degree 7 without data normalization.
+        But with data normalization, it did not explode even when I used degree 500 for polynomial features.}
+
+    \subsection{Batch Normalization}\label{sec:batchNorm}
+        \textbf{Batch normalization} is to normalize the hidden layers about the batch dataset.
+        We first forward pass the mini-batch data, and then, we calculate the mean and standard
+        deviation of the hidden units calculated about each data in the mini-batch dataset.
+        We can apply this at pre-activation or activated layer. In practice, either method can be used.
+
+        Let $a_ni$ be the $i$-th pre-activation unit calculated with $n$-th element of mini-batch dataset.
+        Then,
+        \begin{align}
+            \mu_i &= \frac{1}{K}\sum_{n=1}^{K}a_{ni} \\
+            \sigma_i^2 &= \frac{1}{K}\sum_{n=1}^{K}(a_{ni}-\mu_i)^2
+        \end{align}
+        After that, we can calculate the normalized units: 
+        \[
+        \hat{a}_{ni} = \frac{a_{ni}-\mu_i}{\sigma_i + \epsilon}
+        \]
+        The normalized unit losts some of the degree of freedom. To compensate this, we can scale item
+        by using two learnable parameters $\gamma_i$ and $\beta_i$;
+        \[
+        \tilde{a}_{ni} = \gamma_i \hat{a}_{ni} + \beta_i
+        \]
+        \subsubsection{Inference}
+            In the inference step, we cannot use batch normalization, since there only a single data is
+            used. To solve this, we can evaluate the mean and stdev across the whole hidden units.
+            However, this is usually expensive, so we use \textbf{moving averages} calculated during the
+            training process:
+            \begin{align}
+                \bar{\mu}^{(\tau)}_i &= \alpha\bar{\mu}^{(\tau-1)}_i + (1-\alpha)\mu_i \\
+                \bar{\sigma}^{(\tau)}_i &= \alpha\bar{\sigma}^{(\tau-1)}_i + (1-\alpha)\sigma_i
+            \end{align}
+            calculated with $\tau$-th mini-batch dataset, where $0 \leq \alpha \leq 1$.
+        
+    \subsection{Layer Normalization}
+            Using batch normalization injects too much noise if the batch size is too small.
+            Even when the dataset is too large, the data can be distributed to different GPUs, and
+            batch normalization cannot be applied to the layer. \textbf{Layer normalization} is
+            the alternative of batch normalization, which also uses training datasets to normalize
+            the weights and biases.
+
+            Layer normalization normalize the hidden units with respect to the layer itself.
+            Let's assume that we have hidden layer with $M$ hidden units. Then, we calculate
+            the mean and variance of hidden units;
+            \begin{align}
+                \mu_n&=\frac{1}{M}\sum_{i=1}^{M}a_{ni} \\
+                \sigma_n^2&=\frac{1}{M}\sum_{i=1}^{M}(a_{ni}-\mu_i)^2
+            \end{align}
+            Then, as we did in batch normalization, we normalize the hidden units;
+            \[
+            \hat{a}_{ni} = \frac{a_{ni}-\mu_n}{\sigma_n + \epsilon}
+            \]
+            Note that the layer normalization an be applied during inference,
+            since we can apply layer normalization to one data.
+\end{document}

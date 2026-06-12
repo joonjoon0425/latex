@@ -1,0 +1,2 @@
+- sequential EM algorithm
+- GAN -> algotirhm2e

@@ -1,0 +1,139 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Probabilistic Principal Component Analysis}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    \textbf{Probabilistic principal component analysis} (pPCA) is the probabilistic version of PCA
+    using continuous latent variables. The advantage of pPCA over PCA is:
+    \begin{itemize}
+        \item Use EM algorithm for PCA that is computationally efficient when only a few eigenvectors are required;
+        \item Direct comparison with other probabilistic density models, using likelihood function;
+        \item Can be applied to classification problems;
+        \item Can be run generatively to provide samples from the distribution.
+    \end{itemize}
+\section{Main Ideas}
+    \subsection{Construction of pPCA}
+        pPCA is a simple example of linear-Gaussian framework where all marginal and conditional distributions are Gaussian.
+        We define a Gaussian prior distribution $p(\textbf{z})$ over latent variable $\textbf{z}$ as $p(\textbf{z})=\mathcal{N}(\textbf{z}|\textbf{0},\textbf{I})$.
+        Then, we define the conditional distribution of the observed variable \textbf{x} conditioned over \textbf{z} as
+        $p(\textbf{x}|\textbf{z})=\mathcal{N}(\textbf{x}|\textbf{Wz}+\bm\mu,\sigma^2\textbf{I})$.
+        This is equal to $\tb x = \tb{Wz} + +\bm\mu + \bm\epsilon$ where $\bm\epsilon$ is a Gaussian noise with mean 0 and isotropic covariance.
+
+        \begin{defn}{Probabilistic Principal Component Analysis}{ppca}
+            Let \textbf{z} be a latent variable of $M$ dimension, and let \textbf{x} be observed data. Then, the PPCA is a probabilistic model with following
+            probability distributions;
+            \begin{align*}
+                p(\textbf{z})&=\mathcal{N}(\textbf{0},\textbf{I}) \\
+                p(\textbf{x}|\textbf{z},\bm\theta)&=\mathcal{N}(\textbf{x}|\textbf{Wz}+\bm\mu,\sigma^2\textbf{I})
+            \end{align*}
+            where \tb W is a $D \times M$ weight matrix.
+            Then the marginal distribution of \textbf{x} is given as
+            \[
+                p(\textbf{x}|\bm\theta)=\mathcal{N}(\textbf{x}|\bm\mu,\textbf{C})
+            \]
+            where \textbf{C} is defined by $\textbf{C}=\textbf{W}\textbf{W}^\top + \sigma^2\textbf{I}$.
+
+            The posterior distribution of latent variable \textbf{z} is given as
+            \[
+                p(\textbf{z}|\textbf{x},\bm\theta)=\mathcal{N}(\textbf{z}|\tb{M}^{-1}\tb{W}^\top(\tb{x}-\bm\mu),\sigma^2\tb{M}^{-1})
+            \]
+            where \tb{M} is defined by $\tb{M}=\tb{W}^\top\tb{W}+\sigma^2\tb{I}$
+        \end{defn}
+
+        We can notice that $\sigma^2 \rightarrow 0$ leads to the original PCA.
+
+    \subsection{Maximum Likelihood for pPCA}
+        \begin{thm}{Maximum Likelihood for pPCA}{maxliPPCA}
+            The log-likelihood of pPCA is given as
+            \begin{align*}
+                \log{p(\textbf{X}|\bm\mu\tb{W},\sigma^2)} &= \sum_{n=1}^{N}\log{p(\tb{x}_n|\tb W, \bm\mu,\sigma^2)} \\
+                &= -\frac{ND}{2}\log{2\pi}-\frac{N}{2}\log{|\tb C|}-\frac{1}{2}\sum_{n=1}^{N}(\tb x_n -\bm\mu)^\top\tb{C}^{-1}(\tb x_n - \bm\mu)
+            \end{align*}
+            The MLE of each parameters are given as:
+            \begin{align*}
+                \bm\mu &= \overline{\tb x} \\
+                \tb W &= \tb U_M(\tb L_M -\sigma^2\tb I)^{1/2}\tb R \\
+                \sigma^2 &=\frac{1}{D-M}\sum_{i=M+1}^{D}\lambda_i
+            \end{align*}
+            where $\tb U_M$ is a $D \times M$ matrix whose columns are given by $M$ largest eigenvectors of the data covariance matrix $\tb S$.
+            The $\tb L_M$ has elements given by the corresponding eigenvalues $\lambda_i$, and \tb R is arbitrary $M \times M$ ortogonal matrix.
+            The summation of MLE of $\sigma^2$ is about the leftover eigenvalues of eigenvectors not contained in $\tb U_M$. 
+        \end{thm}
+        Notice that the likelihood function is invariant over the rotation of weight matrix $\tb W$,
+        since $\tb C = \tilde{\textbf{W}}\tilde{\textbf{W}}^\top + \sigma^2\textbf{I}$ where $\tilde{\tb W}=\tb{WR}$ with arbitrary orthogonal matrix $\tb R$.
+
+    \subsection{EM for pPCA}
+        \subsubsection{Expecation Maximization}
+            \begin{algorithm}[H]
+                \DontPrintSemicolon
+                \SetKwInOut{Input}{Input}
+                \SetKwInOut{Output}{Output}
+                \SetArgSty{textnormal}
+
+                \caption{EM algorithm for pPCA}
+                
+                \Input{dataset $\tb X$ with dimensionality $N \times D$\newline
+                initial parameter values $\tb W$, $\sigma^2$}
+                \Output{final parameter values $\tb W$, $\sigma^2$}
+
+                \BlankLine
+                \hrule
+                \tcp{initialize}
+                \Repeat{convergence}
+                {
+                    \tcp{E step}
+                    $\tb M \leftarrow \tb{W}^\top\tb{W}+\sigma^2\tb{I}$\;
+                    $\mathbb{E}[\textbf{z}_n] \leftarrow \tb M^{-1}\tb W^\top(\tb x_n - \bar{\tb{x}})$\;
+                    $\mathbb{E}[\tb z_n \tb z^\top] \leftarrow \sigma^2\tb M^{-1} + \mathbb{E}[\tb z_n]\mathbb{E}[\tb z_n]^\top$\;
+                    \tcp{M step}
+                    $\tb W_{\text{new}} \leftarrow \left[ \sum_{n=1}^{N}(\tb x_n - \overline{\tb x})\mathbb{E}[\tb z_n]^\top \right] \left[ \sum_{n=1}^{N}\mathbb{E}[\tb z_n\tb z_n^\top] \right]^{-1}$\;
+                    $\sigma_{\text{new}}^2 \leftarrow \frac{1}{ND}\sum_{n=1}^{N}\left\{ \|\tb x_n \overline{\tb x}\|^2 -2\mathbb{E}[\tb z_n]^\top\tb W_{\text{new}}^\top(\tb x_n -\overline{\tb x})
+                    + \tb{Tr}(\mathbb{E}[\tb z_n \tb z_n^\top]\tb W_new^\top \tb W_new)\right\}$\;
+                    $\tb W, \sigma^2 \leftarrow \tb W_{\text{new}}, \sigma^2_{\text{new}}$\;
+                }
+                \Return{$\tb W$, $\sigma^2$}
+                \end{algorithm}
+        \subsubsection{ELBO}
+            EM for continuous latent variables are derived in the same way as EM for discrete latent variable. See \href{run:../inference/em_algorithm/em_algorithm.pdf}{this document}
+
+\section{Extensions of pPCA}
+    \subsection{Factor Analysis}
+        In probabilistic PCA, the covariance matrix of latent variable $\tb z$ is given as an identity matrix. If we changed the covariance matrix from identity matrix to diagonal matrix,
+        we obtain \textbf{Factor analysis} model. We assume that the data are linear combination of latent variables plus some Gaussian noise, i.e., $\tb x = \tb{Wz} + \bm\mu + \bm\epsilon$.
+        The main difference from pPCA is, that the noise's variance differes between features, i.e., $\bm\epsilon \sim \mathcal{N}(\tb 0, \bm\Psi)$ where $\bm\Psi$ is diagonal matrix.
+        The conditional probability of data is given as
+        \[
+        p(\tb x| \tb z)=\mathcal{N}(\tb x|\tb W \tb z + \bm\mu, \bm\Psi)
+        \]
+        where $\bm\Psi$ is a diagonal noise matrix. The marginal distribution is then given as
+        \[
+        p(\tb x)=\mathcal{N}(\tb x|\bm\mu,\tb C)
+        \]
+        where $\tb C=\tb W\tb W^\top + \Psi$. This model finds out the correlation between variables, assuming that the correlation stems from common latent variable.
+        Since the noises can differ between features, it can capture the correlation between features well, independent of noises.
+    \subsection{Independent Component Analysis}
+        One of the generalizations of probabilistc PCA assumes that the observed variables are related linearly to the latent variables. The difference is that
+        the latent variables are not Gaussian anymore. \textbf{Independent component analysis} is an important class of such models, which assumes that the latent variables
+        factorizes completely, i.e., $p(\tb z) = \prod_{j=1}^{M}p(z_j)$.
+
+        ICA is used to analyze the idependent components of given data, as we can see from its name. The situation which explains this well is the 'Cocktail Party Problem'.
+        ICA assumes that the original data are the linear combinations of the sources, i.e., $\tb x = \tb A\tb s$, and assumes that each element of $\tb s$ is independent, i.e., $p(\tb s)=\prod_{i=1}^{M}p_i(s_i)$.
+        The objective of ICA is to find out the best decomposition matrix $\tb W$ such that $\tb s = \tb W \tb x$. To do so, we maximize the likelihood of dataset, about $\tb W$, which is given as
+        \[
+            p(\tb x) = \left( \prod_{i=1}^{n}p_i(\tb w_i^\top \tb x) \right)\|\tb W\|
+        \]
+        ICA requires the distribution of latent variables to be non-Gaussian, since it won't be able to distinguish between two different choices for latent variables
+        if these differ simply by a rotation in latent space, as we saw in Theorem \ref{thm:maxliPPCA}.
+        Since the likelihood function produces the same probability even when the latent variable is rotated, there are infinite choices for maximum likelihood. This means that
+        the original sources are impossible to extract since $\tb s = \tb W \tb x$ will produce different $\tb s$ for each rotated $\tb W$. To solve this, ICA
+        uses non-Gaussian distribution, mainly hyperbolic secant, $p_i(s_i)=\frac{1}{\pi\text{cosh}(s_i)}$.
+
+\end{document}

@@ -1,0 +1,212 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Diffusion Model}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    \textbf{Diffusion models} or \emph{denoising diffusion probabilistic models}, recovers data from pure noise. The encoder gradually adds Gaussian noise to the given data,
+    and make it into pure Gaussian noise. Then, the decoder learns how to recover the image from pure Gaussian noise.
+\section{Main Idea}
+    \subsection{Forward Encoder}
+        \subsubsection{Diffusion Process}
+            The \textbf{diffusion process} (forward process) adds Gaussian noise to the data gradually.
+            \begin{defn}{Diffusion Process}{diffProcess}
+                Let $\{\tb z_1,\dots,\tb z_T\}$ be the vectors of same size of given data $\tb x = \tb z_0$,
+                and the process $\tb z_1,\dots,\tb z_T$ is defined as:
+                \[
+                \tb z_t = \sqrt{1-\beta_t}\tb z_{t-1} + \sqrt{\beta_t}\bm\epsilon_t
+                \]
+                where $0 < \beta < 1$ is the variance of the noise distribution and $\bm\epsilon_t \sim \mathcal{N}(\tb 0, \tb I)$. Notice that we can rewrite the equation in the following form;
+                \[
+                q(\tb z_t|\tb z_{t-1})=\mathcal{N}(\tb z_t|\sqrt{1-\beta_t}\tb z_{t-1}, \beta_t\tb I).
+                \]
+            \end{defn}
+            These sequence of distributions forms Markov chain. The values of $\beta_1,\beta_2,\dots,\beta_T \in (0,1)$ are typically chosen by hand such that $\beta_1 < \beta_2 < \dots < \beta_T$.
+        \subsubsection{Diffusion Kernel}
+            Since the distributions $q(\tb z_t|\tb z_{t-1})$ are normal, the marginalized distribution $q(\tb z_t | \tb x)$ can be written in closed form:
+            \begin{thm}{Diffusion Kernel}{diffKern}
+                \[
+                q(\tb z_t|\tb x) = \mathcal{N}(\tb z_t|\sqrt{\alpha_t}\tb x, (1-\alpha_t)\tb I)
+                \]
+                where $\alpha_t = \prod_{\tau=1}^{t}(1-\beta_\tau)$. This marginalized distribution is called \tb{diffusion kernel}. As the noises are added, in the limit $T \to \infty$,
+                we have $q(\tb z_T|\tb x)=\mathcal{N}(\tb z_T|0,\tb I)$, and since the right-hand side is independent of $\tb x$, $q(\tb z_T|\tb x)=q(\tb z_T)$.
+            \end{thm}
+    \subsection{Reverse Decoder}
+        \subsubsection{Conditional Distribution}
+            Since the decoder learns how to denoise the corrupted data, it is natural to consider the probability distribution $q(\tb z_{t-1}|\tb z_t)=\frac{q(\tb z_t|\tb z_{t-1})q(\tb z_{t-1})}{q(\tb z_t)}$.
+            The marginal distribution $q(\tb z_t)$ can be written as $q(\tb z_t)=\int q(\tb z_t|\tb x)p(\tb x)d\tb x$. Notice that it is intractable to evaluate the marginal distribution. So, we consider the conditional
+            version of the reverse distribution conditioned on $\tb x$, which is given as:
+            \begin{thm}{Reverse Conditional Distribution}{revCondDist}
+                The conditional reversed distribution is given as:
+                \begin{align}
+                q(\tb z_{t-1}|\tb z_t, \tb x)&=\frac{q(\tb z_t|\tb z_{t-1},\tb x)q(\tb z_{t-1}|\tb x)}{q(\tb z_t|\tb x)}
+                \\ &=\frac{q(\tb z_t|\tb z_{t-1})q(\tb z_{t-1}|\tb x)}{q(\tb z_t|\tb x)}
+                \\ &=\mathcal{N}(\tb z_{t-1}|\tb m_t(\tb x, \tb z_t), \sigma_t^2\tb I)
+                \end{align}
+                where
+                \begin{align*}
+                    \tb m_t(\tb x, \tb z_t)&=\frac{(1-\alpha_{t-1})\sqrt{1-\beta_t}\tb z_t + \sqrt{\alpha_{t-1}}\beta_t\tb x}{1-\alpha_t}
+                \\  \sigma_t^2&=\frac{\beta_t(1-\alpha_{t-1})}{1-\alpha_{t-1}}.
+                \end{align*}
+            \end{thm}
+                We used Markov chain property $q(\tb z_t|\tb z_{t-1},\dots,\tb x) = q(\tb z_t|\tb z_{t-1})$ in (1) to (2), and used properties of Gaussian distributions in (2) to (3).
+        \subsubsection{Reverse Process}
+            The reverse process is modeled as Gaussian distribution:
+            \begin{defn}{Reverse Process}{revProcess}
+                Let $\beta_1,...\beta_T$ be given as the same schedule in Definition \ref{defn:diffProcess}. Then the reverse process is defined as
+                \[
+                p(\tb z_{t-1}|\tb z_t,\tb w)=\mathcal{N}(\tb z_{t-1}|\bm\mu(\tb z_t, \tb w, t),\beta_t\tb I)
+                \]
+                where $\bm\mu(\tb z_t,\tb w, t)$ is a deep neural network with parameters $\tb w$.
+            \end{defn}
+            Then the likelihood is given as:
+            \begin{align*}
+                p(\tb x| \tb w) &= \int p(\tb x,\tb z_1,\dots,\tb z_T|\tb w)d\tb z_1 \dots d\tb z_T
+            \\  &= \int p(\tb z_T)\left\{ \prod_{t=2}^{T}p(\tb z_{t-1}|\tb z_t,\tb w) \right\}p(\tb x|\tb z_1,\tb w)d\tb z_1 \dots d\tb z_T
+            \end{align*}
+            and the objective is to maximize this likelihood. Here $p(\tb z_T)$ is assumed to equal $q(\tb z_T)$ and hence is given by $\mathcal{N}(\tb z_T|\bm 0,\tb I)$.
+    \subsection{Training}
+        \subsubsection{Evidence Lower Bound}
+            Since the likelihood itself is intractable to be evaluated, we use ELBO like VAE to maximize the likelihood;
+            \begin{align*}
+                \log{p(\tb x|\tb w)}
+                &=\mathcal{L}(\tb w) + \text{KL}(q(\tb z)\|p(\tb z|\tb x,\tb w))
+            \\  \mathcal{L}
+                &=\int q(\tb z)\log{\left\{ \frac{p(\tb x, \tb z|\tb w)}{q(\tb z)} \right\}}d\tb z
+            \\  \text{KL}(q(\tb z)\|p(\tb z|\tb x,\tb w))
+                &=-\int q(\tb z)\log{\left\{ \frac{p(\tb z|\tb x,\tb w)}{q(\tb z)} \right\}}d\tb z
+            \end{align*}
+            We now substitute $q(\tb z)$ and $p(\tb x,\tb z_1,\dots,\tb z_T|\tb w)$
+            with
+            \begin{align*}
+                q(\tb z_1,\dots,\tb z_T|\tb x) &= q(\tb z_1|\tb x)\prod_{t=2}^{T}q(\tb z_t|\tb z_{t-1})
+            \\  p(\tb x,\tb z_1,\dots,\tb z_T|\tb w) &= p(\tb z_t)\prod_{t=2}^{T}p(\tb z_{t-1}|\tb z_t,\tb w)p(\tb x|\tb z_1,\tb w).
+            \end{align*}
+            Then,
+            \begin{align*}
+                \mathcal{L}(\tb w)
+                &= \mathbb{E}_{q(\tb z_{1:T}|\tb x)}\left[ \log{\frac{p(\tb z_T)\{\prod_{t=2}^{T}p(\tb z_{t-1}|\tb z_t,\tb w)\}p(\tb x|\tb z_1, \tb w)}{q(\tb z_1 |\tb x)\prod_{t=2}^{T}q(\tb z_t|\tb z_{t-1},\tb x)}} \right]
+            \\  &= \mathbb{E}_{q(\tb z_{1:T}|\tb x)}\left[ \log{p(\tb z_T)} + \sum_{t=2}^{T}\log{\frac{p(\tb z_{t-1}|\tb z_t,\tb w)}{q(\tb z_t|\tb z_{t-1},\tb x)}} + \log{\frac{p(\tb x|\tb z_1,\tb w)}{q(\tb z_1|\tb x)}} \right].
+            \end{align*}
+            We use Bayes' Theorem and substitute $q(\tb z_t|\tb z_{t-1}, \tb x) = \frac{q(\tb z_{t-1}|\tb z_t, \tb x)q(\tb z_t|\tb x)}{q(\tb z_{t-1}|\tb x)}$.
+            Then,
+            \begin{align*}
+                \mathcal{L}(\tb w)
+                &= \mathbb{E}_{q(\tb z_{1:T}|\tb x)}\left[\sum_{t=2}^{T}\log{\frac{p(\tb z_{t-1}|\tb z_t,\tb w)}{q(\tb z_{t-1}|\tb z_t, \tb x)}} + \log{p(\tb x|\tb z_1, \tb w)} \right]
+            \\  &= \int q(\tb z_1|\tb x)\log{p(\tb x|\tb z_1,\tb w)}d\tb z_1 - \sum_{t=2}^{T}\int \text{KL}(q(\tb z_{t-1}|\tb z_t,\tb x)\|p(\tb z_{t-1}|\tb z_t,\tb w))q(\tb z_t|\tb x)d\tb z_t
+            \end{align*}
+            The first term is called reconstruction term, and the second term is called consistency terms.
+
+            We now substitute $q(\tb z_{t-1}|\tb z_t,\tb x)$ of consistency terms with conditional distribution in Theorem \ref{thm:revCondDist}.
+            \[
+            \text{KL}(q(\tb z_{t-1}|\tb z_t,\tb x)|p(\tb z_{t-1}|\tb z_t,\tb w)) = \frac{1}{2\beta_t}\|\tb m_t(\tb x,\tb z_t)-\bm\mu(\tb z_t,\tb w_t)\|^2 + \text{const}
+            \]
+            and approximate the reconstruction term with Monte Carlo method. Note that we do not need reparametrization method since the encoder is fixed.
+
+            Now we can maximize the ELBO term about parameter $\tb w$.
+
+        \subsubsection{Predicting the Noise instead of Mean}
+            Modifying the ELBO so that we predict the added noise instead of the denoised data itself is known to produce higher quality results.
+            We first rearrange the equation that can be derived from Theorem \ref{thm:diffKern} to give
+            \[
+            \tb x = \frac{1}{\sqrt{\alpha_t}}\tb z_t - \frac{\sqrt{1-\alpha_t}}{\sqrt{\alpha_t}}\bm\epsilon_t
+            \]
+            Using this, we can rewrite the mean $\tb m_t(\tb x,\tb z_t)$ as
+            \[
+            \tb m_t(\tb x,\tb z_t)=\frac{1}{\sqrt{1-\beta_t}}\left( \tb z_t = \frac{\beta_t}{\sqrt{1-\alpha_t}}\bm\epsilon_t \right)
+            \]
+            and similarly, we can rewrite $\bm\mu(\tb z_t, \tb w, t)$, introducing a neural network $\tb g(\tb z_t, \tb w, t)$ that predicts 
+            total noise accumulation:
+            \[
+            \bm\mu(\tb z_t, \tb w, t)=\frac{1}{\sqrt{1-\beta_t}}\left( \tb z_t - \frac{\beta_t}{\sqrt{1-\alpha_t}}\tb g(\tb z_t, \tb w, t) \right)
+            \]
+
+            Substituting these eqautions to the consistency terms, we get
+            \begin{align*}
+                \text{KL}(q(\tb z_{t-1}|\tb z_t,\tb x)\|p(\tb z_{t-1}|\tb z_t,\tb w))
+                &=\frac{\beta_t}{2(1-\alpha_t)(1-\beta_t)}\|\tb g(\tb z_t, \tb w, t)-\bm\epsilon_t\|^2 + \text{const}
+            \\  &=\frac{\beta_t}{2(1-\alpha_t)(1-\beta_t)}\|\tb g(\sqrt{\alpha_t}\tb x + \sqrt{1-\alpha_t}\bm\epsilon_t, \tb w, t)-\bm\epsilon_t\|^2 + \text{const}
+            \end{align*}
+
+            The reconstruction term can be approximated with a sampled value of $\tb z_1$. Then we have
+            \begin{align*}
+                \log{p(\tb x|\tb z_1,\tb w)}
+                &=-\frac{1}{2\beta_1}\| \tb x-\bm\mu(\tb z_1,\tb w,1) \|^2 + \text{const}
+            \\  &=-\frac{1}{2(1-\beta_1)}\|\tb g(\tb z_1,\tb w,1)-\bm\epsilon_1\|^2 + \text{const}
+            \end{align*}
+            Using $\alpha_1=1-\beta_1$, we can combine the reconstruction term and consistency term:
+            \[
+            \mathcal{L}(\tb w)=-\sum_{t=1}^{T}\frac{\beta_t}{2(1-\alpha_t)(1-\beta_t)}\|\tb g(\sqrt{\alpha_t}\tb x + \sqrt{1-\alpha_t}\bm\epsilon_t,\tb w, t) - \bm\epsilon_t\|^2
+            \]
+            ignoring the constants.
+            A further empirical study showed that performance is improved by ommiting the factor $\frac{\beta_t}{2(1-\alpha_t)(1-\beta_t)}$.
+
+            \begin{algorithm}[H]
+                \DontPrintSemicolon
+                \SetKwInOut{Input}{Input}
+                \SetKwInOut{Output}{Output}
+                \SetArgSty{textnormal}
+
+                \caption{Denoising diffusion probabilistic model (DDPM) training algorithm}
+
+                \Input{training data $\data = \{\tb x_1,\dots,\tb x_N\}$ \newline
+                noise schedule $\{\beta_1,\dots,\beta_T\}$}
+                \Output{network parameters \tb w}
+
+                \BlankLine
+                \hrule
+                
+                \For{$t \in \{1,\dots,T\}$}
+                {
+                    $\alpha_t \leftarrow \prod_{\tau=1}^{t}(1-\beta_t)$\;
+                }
+                \Repeat{convergence}
+                {
+                    $\mathcal{L} \leftarrow 0$\;
+                    \For{mini-batch $\{\tb x_n\}$}
+                    {
+                        $t \sim \{1,\dots,T\}$\;
+                        $\bm\epsilon \sim \mathcal{N}(\bm 0, \tb I)$\;
+                        $\tb z_t \leftarrow \sqrt{\alpha_t}\tb x + \sqrt{1-\alpha_t}\bm\epsilon$\;
+                        $\mathcal{L}(\tb w) \leftarrow \mathcal{L}(\tb w) + \|\tb g(\tb z_t,\tb w, t)-\bm\epsilon\|^2$\;
+                    }
+                    $\tb w \leftarrow \tb w - \nabla_w\mathcal{L}(\tb w)$\;
+                }
+
+                \Return{\tb w}
+            \end{algorithm}
+    \subsection{Sampling}
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{Denoising diffusion probabilistic model (DDPM) sampling algorithm}
+
+            \Input{trained denoising network $\tb g(\tb z,\tb w,t)$ \newline
+            noise schedule $\{\beta_1,\dots,\beta_T\}$}
+            \Output{sample vector \tb x in data space}
+
+            \BlankLine
+            \hrule
+            $\tb z_T \leftarrow \mathcal{N}(\tb 0, \tb I)$\;
+            \For{$t \in \{T,\dots,2\}$}
+            {
+                $\alpha_t \leftarrow \prod_{\tau=1}^{t}(1-\beta_\tau)$\;
+                $\bm\mu(\tb z_t, \tb w, t) \leftarrow \frac{1}{\sqrt{1-\beta_t}}(\tb z_t - \frac{\beta_t}{1-\alpha_t}\tb g(\tb z_t,\tb w,t))$\;
+                $\bm\epsilon \leftarrow \mathcal{N}(\tb 0, \tb I)$\;
+                $\tb z_{t-1} \leftarrow \bm\mu(\tb z_t,\tb w,t) + \sqrt{\beta_t}\bm\epsilon$\;
+            }
+            $\tb x \leftarrow \frac{1}{\sqrt{1-\beta_1}}(\tb z_1 - \frac{\beta_1}{\sqrt{1-\alpha_1}}\tb g(\tb z_1,\tb w,1))$\;
+            \Return{\tb x}
+        \end{algorithm}
+\section{Score Matching}
+\end{document}

@@ -1,0 +1,32 @@
+\documentclass{report}
+\input{~/studies/preamble}
+\usepackage{subfiles}
+\usepackage{titletoc}
+\usepackage{bbm}
+
+\makeatletter
+\newcommand{\makeSubfileHeader}[1]{
+        \ifSubfilesClassLoaded{
+        \counterwithout{section}{chapter}
+        \thispagestyle{plain}
+        \section*{Contents}
+        \startcontents[chapters]
+        \printcontents[chapters]{}{1}{}
+        \clearpage}{}
+}
+\makeatother
+\newcommand{\E}{\mathbb{E}}
+
+
+\title{Notes on Reinforcement Learning}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\subfile{fundamentals/bandits/bandits.tex}
+\subfile{fundamentals/mdp/mdp.tex}
+\subfile{fundamentals/dp/dp.tex}
+\end{document}

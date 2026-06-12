@@ -1,0 +1,442 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Sampling}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    In this document, we discuss about sampling methods mainly used in deep learning. We use sampling methods
+    to handle imbalanced dataset, to create a generated data from generative model, to calculate marginal distribution
+    or to estimate the uncertainty of prediction. A lot more usage can be found elsewhere. 
+
+\section{Basic Sampling Algorithms}
+    \subsection{Inverse Transform Sampling}
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \caption{Inverse transform sampling algorithm}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            
+            \Input{desired distribution $p(\cdot)$}
+            \Output{$z \sim p(z)$}
+
+            \BlankLine
+            \hrule
+
+            $h(x)$ $\leftarrow$ the inverse of the indefinite integral of $p(x)$.\;
+            $u \sim \mathcal U(0,1)$.\;
+            $z \leftarrow h(x)$
+
+            \Return{$z$}
+        \end{algorithm}
+
+        \begin{proof}
+            Suppose $Y=g(Z) \sim p(x)$ where $Z \sim \mathcal U(0,1)$. We want to obtain $g(\cdot)$.
+            Then, 
+            \begin{align*}
+                \int_{-\infty}^{y} p(t)dt &= \mathbb P(Y \leq y)  \\
+                &= \mathbb P(g(Z) \leq y) \\
+                &= \mathbb P(z \leq g^{-1}(y)) \\
+                &= g^{-1}(y)
+            \end{align*}
+            Therefore $g(z)$ is the inverse of the indefinite integral of $p(x)$. 
+        \end{proof}
+
+        The \textbf{inverse transform sampling} is the most basic sampling method.
+        \begin{itemize}
+            \item It is useful for distributions whose inverse of CDF is easy to obtain.
+            \item In other word, in is impossible to use this method if the dimension is too high or the inverse of CDF is impossible to calculate.
+        \end{itemize}
+    
+        Here is a specific method for generating samples from a two-dimensional Gaussian distribution, which is called the \textbf{Box-Muller method}.
+
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \caption{Box-Muller algorithm}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \Input{empty}
+            \Output{$y_1,y_2 \sim \mathcal N(\textbf{0}, \textbf{I}_{2 \times 2})$}
+
+            \BlankLine
+            \hrule
+
+            $z_1 \sim \mathcal U(-1,1)$\;
+            $z_2 \sim \mathcal U(-1,1)$\;
+            $r \leftarrow z_1^2+z_2^2$\;
+            \Repeat{The samples are not dicarded}{
+                \eIf{$z_1^2+z_2^2 \leq 1$}
+                {
+                    $y_1 \leftarrow z_1\left( \frac{-2\log{r^2}}{r^2} \right)^{\frac{1}{2}}$\;
+                    $y_2 \leftarrow z_2\left( \frac{-2\log{r^2}}{r^2} \right)^{\frac{1}{2}}$\;
+                }
+                {
+                    discard samples
+                }
+            }
+            \Return{$y_1,y_2$}
+        \end{algorithm}
+        \begin{proof}
+            Try to calculate the joint distribution of $y_1$ and $y_2$.
+        \end{proof}
+        We can obtain the samples from Gaussian distribution with mean $\bm{\mu}$ and variance $\bm{\Sigma}=\mathbf{L}\mathbf{L}^{\top}$ (Cholesky decomposition),
+        by transforming the samples through linear transformation $\textbf{x}=\bm{\mu}+\textbf{L}\textbf{y}$.
+
+    \subsection{Rejection Sampling}
+        The \textbf{rejection sampling} allow us to pick samples from complex distribution $p(z)$. We use proposal function $q(z)$ which is easier to
+        sample from. Furthermore, we suppose the value of $p(z)$ is easy to calculte up to normalization constant $Z_p$, i.e.,
+        $\tilde{p}(z)$ satisfying $p(z)=\dfrac{1}{Z_p}\tilde{p}(z)$ is easy to calculate.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \caption{Rejection sampling algorithm}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \Input{function $\tilde{p}(\cdot)$ satisfying $p(z)=\dfrac{1}{Z_p}\tilde{p}(z)$ where the desired distribution is $p(\cdot)$\newline
+            constant $k$ \newline
+            proposal distribution $q(\cdot)$ satisfying $kq(z) \geq \tilde{p}(z)$
+            }
+            \Output{$z \sim p(z)$}
+
+            \BlankLine
+            \hrule
+
+            \Repeat{The sample is accepted}
+            {
+                $x \sim q(z)$\;
+                $u \sim \mathcal U(0, kq(x))$\;
+                \eIf{$u \leq \tilde{p}(z)$}
+                {accept sample $u$}
+                {reject sample $u$}
+            }
+
+            \Return{$u$}
+        \end{algorithm}
+
+        \begin{proof}
+            Let $X \sim q(z)$ and let $A$ be the event of $X$ being accepted. What we have to prove is $\displaystyle{P(X \leq x | A) = \int_{-\infty}^{x} p(t)dt}$.
+            Since $\displaystyle{P(X \leq x, A)=\int_{-\infty}^{x}P(A | X=t)q(t)dt}$, and $\displaystyle{P(A|X=t)=\dfrac{\tilde{p}(t)}{kq(t)}}$,
+            $\displaystyle{P(X \leq x, A)=\dfrac{1}{k}\int_{-\infty}^{x}\tilde{p}(t)dt}$.
+            
+            And $\displaystyle{P(A) = P(X \leq \infty, A)=\frac{1}{k}\int_{-\infty}^{\infty}\tilde{p}(t)dt=\frac{Z_p}{k}}$. Then
+            \begin{align*}
+                P(X \leq x | A) &= \frac{P(X \leq x, A)}{P(A)} = \frac{\dfrac{1}{k}\displaystyle{\int_{-\infty}^{x}}\tilde{p}(t)dt}{\dfrac{Z_p}{k}} \\
+                &= \int_{-\infty}^{x}\frac{\tilde{p}(t)}{Z_p}dt = \int_{-\infty}^{x} p(t)dt
+            \end{align*}
+        \end{proof}
+        
+        The constant $k$ must be as small as possible subject to the constraint $kq(z) \geq \tilde{p}(z)$, to reduce rejection counts.
+        \begin{itemize}
+            \item We can sample from complex distributions such as gamma distribution, using the rejection sampling;
+            \item If the dimension of the distribution gets higher, the number of rejected samples increase tremendously, leading to inefficiency.
+        \end{itemize}
+
+    \subsection{Adaptive Rejection Sampling}
+        In rejection sampling, rejected samples are discarded. In \textbf{adaptive rejection sampling}, we don't just discard the rejected samples.
+        We use it to improve the envelope function which is used as proposal distribution. The construction of envelope function is straightforward
+        if the desired distribution $p(x)$ is log-concave, i.e., $\log{p(z)}$ has non-increasing derivatives. Even if $p(x)$ is not log-concave, we still
+        can use adaptive sampling if we follow each rejection sampling step with a Metropolis-Hastings step.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \caption{Adaptive rejection sampling algorithm}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            
+            \Input{log-concave distribution $p(\cdot)$ \newline
+            set of grid points $Z$ = \{$z_1, z_2, \dots, z_N$ \} \newline
+            constant $k$}
+            \Output{$z \sim p(z)$}
+
+            \BlankLine
+            \hrule
+
+            \Repeat{The sample is accepted}{
+                Construct the envelope function $\log{q(x)}$ of $\log{p(x)}$ over grid points $Z$\;
+                $z \sim q(x)$\;
+                $u \sim \mathcal U(0, kq(z))$\;
+                \eIf{$u \leq p(x)$}
+                {
+                    accept sample $u$\;
+                }
+                {
+                    $Z \leftarrow Z \cup \{z\}$\;
+                    reject sample $u$\;
+                }
+            }
+            \Return{$u$}
+        \end{algorithm}
+
+    \subsection{Importance Sampling}
+        \textbf{Importance sampling} is precisely not a sampling method. It is used to calculate expectation of given random
+        variable. As with rejection sampling, importance sampling uses proposal distribution for calculating expectation of 
+        the function of random variable follwing desired distribution. The importance sampling algorithm is mainly used in off-policy reinforcment learning.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \caption{Importance sampling algorithm}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \Input{probability distribution $p(\cdot)$ \newline
+            proposal distribution $q(\cdot)$ \newline
+            function $f(\cdot)$}
+            \Output{$\mathbb{E}_{x \sim p(x)}[f(x)]$}
+
+            \BlankLine
+            \hrule
+
+            $\{z_1, z_2, \dots, z_N\} \sim q(x)$\;
+            $w_i \leftarrow \dfrac{p(z_i)}{q(z_i)}$ for $i=1,2,\dots,N$\;
+            $\displaystyle{E \leftarrow \frac{1}{N}\sum_{i=1}^{N}f(z_i)w_i}$
+
+            \Return{$E$}
+        \end{algorithm}
+        \begin{proof}
+            The main idea is to manipulate the equation $\mathbb{E}[f(z)]=\displaystyle\int f(z)p(z)dz$ to $\displaystyle\int f(z)\dfrac{p(z)}{q(z)}q(z)dz$.
+        \end{proof}
+
+        The quantities $w_i = \dfrac{p(z_i)}{q(z_i)}$ are called \textbf{importance weights}, and they compensate for the samples which are sampled more or less compared to
+        the desired distribution.
+        Importance sampling uses the \textbf{Monte Carlo} method, which uses sampling to integrate complicated integrands.
+
+        \begin{itemize}
+            \item If we construct $q(z)$ very well according to the target space, we can significantly decrease the variance of expectation
+                much better than ordinary Monte Carlo method.
+            \item However, if we construct $q(z)$ so that it is small at regions where $p(z)f(z)$ is very large, the variance may be small even
+                if the estimate of the expectation may be severely wrong. Moreover, it is hard to construct $q(z)$ if the dimension is very high.
+        \end{itemize}
+
+        
+
+    \subsection{Sampling-importance-resampling}
+        \textbf{Sampling-importance-resampling} method revises importance sampling method so that it can actually create samples.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \caption{Importance sampling algorithm}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \Input{desired distribution $p(\cdot)$ \newline
+            proposal distribution $q(\cdot)$}
+            \Output{$z \sim p(z)$}
+
+            \BlankLine
+            \hrule
+
+            $\{z_1, z_2, \dots, z_N\} \sim q(z)$\;
+            $w_i \leftarrow \dfrac{p(z_i)}{q(z_i)}$ for $i=1,2,\dots,N$\;
+            $w_i \leftarrow \dfrac{w_i}{\sum_{j=1}^{N}w_j}$ for $i=1,2,\dots,N$\;
+            $r \sim \{z_1, z_2, \dots, z_N\}$, following $\mathcal M(w_1, w_2,\dots,w_N)$\; 
+
+            \Return{$r$}
+        \end{algorithm}
+        \begin{proof}
+            We can prove this by showing that for any test function $g(x)$, $\mathbb{E}[g(T)] = \displaystyle\int g(t)p(t)dt$, where $T$ is the resampled target variable.
+            
+            Let $\{z_1, z_2, \dots, z_N\}$ be the $N$ initial samples drawn i.i.d. from the proposal distribution $q(z)$. 
+            The target variable $T$ is obtained by resampling from this set, meaning $T$ takes the value of $z_i$ with the normalized importance weight $w_i$:
+            \[
+            \mathbb P(T = z_i \mid z_1, z_2, \dots, z_N) = w_i = \frac{p(z_i)/q(z_i)}{\sum_{j=1}^{N} p(z_j)/q(z_j)}.
+            \]
+            
+            Using the law of iterated expectation by conditioning on the initial samples $\mathbf{z} = \{z_1, \dots, z_N\}$, we can expand $\mathbb{E}[g(T)]$ as follows:
+            \begin{align*}
+                \mathbb{E}[g(T)] &= \mathbb{E}_{z_1,\dots,z_N \sim q}\left[\mathbb{E}_{T \sim \mathcal M(w_1,\dots,w_N)}[g(T) \mid z_1,z_2,\dots,z_N]\right]
+                \\ &= \mathbb{E}_{z_1,\dots,z_N \sim q}\left[\sum_{i=1}^{N} w_i g(z_i)\right] \quad \text{(since } T \text{ becomes } z_i \text{ with prob } w_i \text{)}
+                \\ &= \mathbb{E}_{z_1,\dots,z_N \sim q}\left[\frac{\displaystyle\frac{1}{N}\sum_{i=1}^{N}\dfrac{p(z_i)}{q(z_i)}g(z_i)}{\displaystyle\frac{1}{N}\sum_{j=1}^{N}\dfrac{p(z_j)}{q(z_j)}}\right]
+            \end{align*}
+            
+            By the law of large numbers, as $N \rightarrow \infty$, the sample means of the initial particles $z_{1:N}$ converge non-randomly to their expectations under $q(z)$:
+            \begin{align*}
+                \frac{1}{N}\sum_{i=1}^{N}\frac{p(z_i)}{q(z_i)}g(z_i) &\longrightarrow \mathbb{E}_{z \sim q}\left[\frac{p(z)}{q(z)}g(z)\right] = \int \frac{p(z)}{q(z)}g(z)q(z)dz = \int p(z)g(z)dz
+                \\ \frac{1}{N}\sum_{j=1}^{N}\frac{p(z_j)}{q(z_j)} &\longrightarrow \mathbb{E}_{z \sim q}\left[\frac{p(z)}{q(z)}\right] = \int \frac{p(z)}{q(z)}q(z)dz = 1
+            \end{align*}
+            
+            Since the terms inside the expectation converge to deterministic constants, the outer expectation with respect to the initial samples $z_{1:N}$ resolves, and we get:
+            \[
+                \mathbb{E}[g(T)] = \mathbb{E}_{z_{1:N} \sim q}\left[ \dfrac{\int p(z)g(z)dz}{1} \right] = \displaystyle\int p(t)g(t)dt.
+            \]
+        \end{proof}
+
+        \begin{itemize}
+            \item We don't have to take care of constant $k$ and normalization constant $Z_p$ when using proposal distirbution,
+            \item We can increase the effective sample size, by discarding meaningless samples.
+            \item However, since the samples with low probability are kept discarded, the diversity of samples decreases.
+        \end{itemize}
+
+\section{Markov Chain Monte Carlo}
+    \subsection{Introduction}
+        The main idea of Markov chain Monte Carlo is to use the \emph{stationary distribution} of \emph{Markov chain}. If we can
+        construct Markov chain with our desired distribution $p(x)$ as stationary distirbution, we will be able to collect the sample from $p(x)$
+        easily by just following the chain.
+
+    \subsection{Markov Chain}
+        The \textbf{Markov chain} is defined to be a series of random variables such that each random variable only depends on its previous variable.
+        \begin{defn}{Markov Chain}{markovChain}
+            The \textbf{Markov chain} is a sequence of random variables \{$z_1, z_2, \dots, z_N$\}
+            satisfying following conditional independence property for $n \in \{1,\dots,N\}$;
+            \[
+            p(z_{i+1}|z_i, z_{i-1}, \dots, z_1)=p(z_{i+1}|z_i)
+            \]
+
+            The \textbf{transition probabilities} $T_n(z_n, z_{n+1}) = p(z_{n+1}|z_{n})$ is used to specify the Markov chain. If the transition probabilities
+            are same for all $n$, then the Markov chain is called \emph{homogeneous}.
+        \end{defn}
+
+        \begin{defn}{Stationary Distribution with respect to a Homogeneous Markov Chain}{statDistMChain}
+            The probability distribution $p(z)$ is said to be \textbf{stationary with respect to a homogeneous Markov chain}
+            if $p(x)$ satisfies following condition for a transtition probability $T$:
+            \[
+            p(z)=\int T(z', z)p(z')dz'
+            \]
+            for all $z$ in Markov chain.
+        \end{defn}
+
+        As the Markov chains gets longer so that the sequence follows stationary distribution, the random variable afterward will follow the stationary distribution, too.
+        So if we can construct a Markov chain with the specific stationary distribution, we can get samples from that stationary distribution.
+
+        The following condition is a sufficient but not necessary condition for ensuring that the distribution $p(z)$ is
+        stationary about Markov chain.
+
+        \begin{thm}{Detailed Balance}{detailBalance}
+            Let $p(z)$ be a probability distribution and let $T$ be a transition probability of a homogeneous Markv chain.
+            Then, $p(z)$ is stationary with respect to the Markov chain if it satisfies the \textbf{detailed balance} condition:
+            \[
+            p(z)T(z, z') = p(z') T(z', z)
+            \]
+            for all pairs of $z$ and $z'$ of Markov chain.
+        \end{thm}
+
+    \subsection{Metropolis-Hastings Algorithm}
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \caption{Metropolis-Hastings algorithm}
+
+            \Input{unnormalized distribution $\tilde{p}(z)$ \newline
+            proposal distributions $\{q_k(z|\hat{z}):k\in 1,\dots K\}$ \newline
+            mapping from iteration index to distribution index $M(\cdot)$ \newline
+            initial state $z^{(0)}$ \newline
+            number of iterations $T$
+            }
+            \Output{$z \sim p(z)$}
+
+            \BlankLine
+            \hrule
+
+            $z_{prev} \leftarrow z^{(0)}$\;
+
+            \For{$\tau \in {1, \dots, T}$}
+            {
+            $k \leftarrow M(\tau)$\;
+            $z' \sim q_k(z|z_{prev})$\;
+            $u \sim \mathcal{U}(0,1)$\;
+            \eIf{$\dfrac{\tilde{p}(z')q(z_{prev}|z')}{\tilde{p}(z_{prev})q(z'|z_{prev})} > u$}
+            {
+                $z_{prev} \leftarrow z'$
+            }
+            {
+                $z_{prev} \leftarrow z_{prev}$
+            }
+            }
+            \Return{$z_{prev}$}
+        \end{algorithm}
+        The Metropolis-Hastings algorithm at a specific step $\tau$ draws a sample from proposal distribution and accept it with probability $A_k(z',z^{(\tau)})$
+        where
+        \[
+        A_k(z', z^{(\tau)})=\min{\left(1, \frac{\tilde{p}(z')q_k(z^{(\tau)}|z')}{\tilde{p}(z^{(\tau)})q_k(z'|z^{(\tau)})} \right)}.
+        \] 
+        \begin{proof}
+            We show that the distirbution $p(z)$ is stationary distribution of Markov chain with following transition probabilities;
+            $T_k(z, z') = q_k(z'|z)A_k(z,z')$. This is easily proved by using Theorem \ref{thm:detailBalance}.
+        \end{proof}
+
+        Since the samples that are within small steps are highly correlated, we collect samples at each 10 or more steps. This is called \emph{thinnig}.
+        In the high-dimensional spaces, the accept probability of samples gets very low and meaningful samples are difficult to obtain.
+        To overcome this, we use \textbf{Gibbs Sampling}.
+
+    \subsection{Gibbs Sampling}
+        The \textbf{Gibbs sampling} is a kind of Markov chain Monte Carlo algorithm, and can be seen as a special case of Metropolis-Hastings algorithm.
+        
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{Gibbs sampling algorithm}
+
+            \Input{initial values $\{z_1,\dots,z_M\}$ \newline
+            conditional distributions $\{p(z_i|\{z_{j \neq i}\}) : i \in \{1,\dots,M\}\}$ \newline
+            number of iterations $T$}
+            \Output{final values $\{z_1,\dots,z_M\}$}
+
+            \BlankLine
+            \hrule
+            
+            \For{$\tau \in \{1,\dots,T\}$}
+            {
+                \For{$i \in \{1,\dots,M\}$}
+                {
+                    $z_i \sim p(z_i|\{z_{j \neq i}\})$\;
+                }
+            }
+            \Return{$\{z_1,\dots,z_M\}$}
+            
+        \end{algorithm}
+
+        TODO:Gibbs sampling can be obtained from Metropolis-Hastings algorithm;
+    \subsection{Ancestral Sampling}
+        \textbf{Ancestral sampling} algorithm is mainly used for probabilistic graphical models. When the joint distribution is given by
+        \[
+        p(\textbf{z})=\prod_{i=1}^{M}p(\textbf{z}_i|\text{pa}(i))
+        \]
+        we traverse the nodes in its topological order, picking a sample from distribution $p(\textbf{z}_i|\text{pa}(i))$ at each variable node.
+        This is possible, since traversing in topological order ensures that all the parent nodes are visited before visiting certain node.
+        
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            \SetArgSty{textnormal}
+
+            \caption{Ancestral sampling algorithm}
+
+            \Input{joint distribution $p(\textbf{z})=\prod_{i=1}^{M}p(\textbf{z}_i|\text{pa}(i))$ 
+            where nodes are given in topolgical order $\{\textbf{z}_1,\dots,\textbf{z}_M\}$}
+            \Output{$\textbf{z} \sim p(\textbf{z})$}
+
+            \BlankLine
+            \hrule
+            
+            \For{$i \in \{1,\dots,M\}$}
+            {
+                $\textbf{z}_i^* \sim p(\textbf{z}_i|\text{pa}(i))$\;
+            }
+
+            \Return{$\textbf{z}^*$}
+        \end{algorithm}
+
+    TODO:likelihood weight sampling
+
+\section{Langevin Sampling}
+
+\end{document}

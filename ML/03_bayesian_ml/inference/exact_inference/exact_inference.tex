@@ -1,0 +1,252 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\newcommand{\indep}{\perp \!\!\! \perp}
+
+\title{Exact Inference}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    This document explains exact inference algorithms. Inferencing, is a process of updating
+    the probability distribution according to the observed variables.
+
+    We'll need some knowledge about \href{run:../../_theory/PGM/PGM.pdf}{probabilistic graphical models}, since these algorithms are
+    based on them.
+    
+\section{Sum-product Algorithm}
+    \subsection{Introduction}
+        Sum-product algorithm can be applied to undirected tree, directed tree and polytree.
+        The definition of \textbf{tree} and \textbf{polytree} is as following:
+        \begin{itemize}
+            \item \textbf{Undirected tree}: Only one path exists between nodes.
+            \item \textbf{Directed tree}: Nodes have only one parent, and root node has no parent.
+            \item \textbf{Directed polytree}: Nodes can have more than one parent, but still only one path
+            (ignoring directions of the arrows) exists between nodes.
+        \end{itemize}
+    \subsection{Factor Graphs}
+        We first discuss about another graphical model, called \textbf{factor graph}.
+        \begin{defn}{Factor Graph}{facGraph}
+            A \textbf{factor graph} is a \emph{bipartite graph} with factor node $\{f_s\}$ and variable node $\{\textbf{x}_k\}$ 
+            that represents following probability distribution:
+            \[
+            p(\textbf{x})=\prod_{s} f_s(\textbf{x}_s)
+            \]
+            where $\textbf{x}_s$ is a subset of variable nodes associated with a factor node $f_s$.
+        \end{defn}
+        The factor graph will be helpful in understanding the sum-product algorithm.
+        
+        We can reconstruct undirected tree and directed tree and polytree into factor graph, which will be a tree again.
+        We can just add conditional probabilities in the factored distribution as factor nodes,
+        and ordinary nodes as variable nodes.
+
+        % TODO: add factor graph example
+
+    \subsection{Sum-product Algorithm}
+        We can calculate marginal distributions by summing up useless variables. However, this is very costly if we
+        sum up in naive way. We must exploit the conditional independency inherent in the graphical models.
+        The \textbf{sum-product} algorithm allows us to do so. It uses \textbf{message passing}, which efficiently exploits the structure of the given probability distribution
+
+        We assume that we apply this algorithm to tree or polytree with discrete random variables.
+        Continuous variable can use the same algorithm, changing all $\Sigma$ to $\int$.
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \caption{Sum-product algorithm (belief propagation)}
+
+            \Input{factor graph $\mathcal G = (\mathcal V, \mathcal F, \mathcal E)$ of probability distribution $p(x)$ with a tree structure}
+            \Output{exact marignal distribution $p(x)$ of any variable node $x$}
+
+            \BlankLine
+            \hrule
+
+            \tcp{initialization}
+            \ForEach{leaf node in the graph}
+            {
+                \If{leaf node is a variable node}
+                {
+                    $\mu_{x \to f}(x) \leftarrow 1$ for each $f \in \text{ne}(x)$\;
+                }
+                \If{leaf node is a factor node}
+                {
+                    $\mu_{f \to x}(x) \leftarrow f(x)$ for each $x \in \text{ne}(f)$\;
+                }
+            }
+            \tcp{propagation}
+            \While{there are missing messages}
+            {
+                \ForEach{edge $e=(x,f) \in \mathcal E$ where $x \in \mathcal V$ and $f \in \mathcal F$}
+                {
+                    \If{$x$ has received all messages}
+                    {
+                        $\mu_{x \to f}(x) \leftarrow \prod_{f_l \in \text{ne}(x) \setminus f}\mu_{f_l \to x}(x)$
+                    }
+                }
+                \ForEach{edge $e=(x,f) \in \mathcal E$ where $x \in \mathcal V$ and $f \in \mathcal F$}
+                {
+                    \If{$f$ has received all messages}
+                    {
+                        $\mu_{f \to x}(x) \leftarrow \left(\sum_{\text{ne}(f) \setminus x} f(x, \text{ne}(f) \setminus x)\right) \left(\prod_{x_m \in \text{ne}(f) \backslash x}\mu_{x_m \to f}(x_m)\right)$
+                    }
+                }
+            }
+            \tcp{caculate marginal distributions}
+            \ForEach{node $x \in \mathcal V$}
+            {
+                $p(x) \leftarrow \prod_{f \in \text{ne}(x)}\mu_{f \to x}(x)$\;
+                normalize $p(x)$\;
+            }
+            \Return{$p(x)$ about each node $x \in \mathcal V$}
+        \end{algorithm}
+
+        \begin{proof}
+            See Bishop, 2006. The point is to exchange the product and sum. Look at equation $a(b+c) = ab+ac$.
+            We only need two execution to calculate $a(b+c)$, while three execution is required for calculating $ab + ac$.
+            The algorithm exploits this efficiency.
+        \end{proof}
+
+        We can efficiently calculate the marginal probability of any variable $x$
+        by;
+        \begin{enumerate}
+            \item Pass message from leaves to root;
+            \item Pass message from root to leaves.
+        \end{enumerate}
+        We save the intermediate message passed to each node. This will use extra memory, but
+        eliminate useless calculation, in a sense of dynamic programming.
+        
+        We can also get the conditional distribution when some variables are observed:
+        
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \caption{Modified sum-product algorithm for conditional distributions}
+
+            \Input{factor graph $\mathcal G = (\mathcal V, \mathcal F, \mathcal E)$ of probability distribution $p(x)$ with a tree structure \newline
+            observed values $\{\hat{v}_1, \dots, \hat{v}_n\}$ of variable nodes $\{v_1, \dots, v_n\}$}
+            \Output{exact conditional distribution $p(x|v_1=\hat{v}_1, v_2=\hat{v}_2, \dots, v_n=\hat{v}_n)$ of unobserved variable node $x$}
+
+            \BlankLine
+            \hrule
+
+            $p(x) \leftarrow p(x)\prod_i \delta(v_i, \hat{v}_i)$\;
+            $r$ $\leftarrow$ sum-product algorithm about $p(x)$\;
+
+            \Return{$r$}
+        \end{algorithm}
+
+        Multiplying by $\prod_{i} \delta(v_i, \hat{v}_i)$, the joint distribution equals
+        $p(\textbf{x} \backslash \textbf{v}, \textbf{v} = \hat{\textbf{v}})$.
+        Then, by applying sum-product algorithm, we can calculate $p(x_i|\textbf{v}=\hat{\textbf{v}})$ with $x_i \notin \{v_1, v_2, ..., v_n\}$ up to a normalization constant,
+        which can be calculated efficiently using local computation.
+        
+        Calculating the marginal distribution of more than one variable is most natural when the variables
+        are associated with same factor. If not, one has to marginalize out other variables.
+        \begin{enumerate}
+            \item Use the Bayes theorem: $p(x, y)=p(x|y)p(y)$;
+            \item Add dummy factor node $f_s$ connecting $x$ and $y$, where $f_s(x,y)=1$.
+        \end{enumerate}
+
+        The sum-product algorithm cannot be applied to a graph with loops, since the message passing will
+        going to be repeated forever in the loop. However, we still can use this algorithm with loops, but it won't
+        produce an exact result, but produce an approximate result.
+        See section \ref{sec:loopyBeliefPropAlg} for more information.
+
+\newpage
+
+\section{Max-sum Algorithm}
+    \subsection{Introduction}
+        The \textbf{max-sum algorithm} is used to find out the MAP estimate of a given
+        graphical model. It uses message passing, the one used for sum-product algorithm.
+        Since multiplying small values can occur underflow, we use logarithm, which turns product into sums,
+
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+
+            \caption{Max-sum algorithm}
+
+            \Input{factor graph $\mathcal G = (\mathcal V, \mathcal F, \mathcal E)$ of probability distribution $p(x)$ with a tree structure}
+            \Output{the configuration $x^*$ that maximizes the probability distribution $p(x)$}
+
+            \BlankLine
+            \hrule
+
+            \tcp{initialization}
+            \ForEach{leaf node in the graph}
+            {
+                \If{leaf node is a variable node}
+                {
+                    $\mu_{x \to f}(x) \leftarrow 0$ for each $f \in \text{ne}(x)$\;
+                }
+                \If{leaf node is a factor node}
+                {
+                    $\mu_{f \to x}(x) \leftarrow \log{f(x)}$ for each $x \in \text{ne}(f)$\;
+                }
+            }
+            \tcp{propagation}
+            \While{there are missing messages}
+            {
+                \ForEach{edge $e=(x,f) \in \mathcal E$ where $x \in \mathcal V$ and $f \in \mathcal F$}
+                {
+                    \If{$x$ has received all messages}
+                    {
+                        $\mu_{x \to f}(x) \leftarrow \sum_{f_l \in \text{ne}(x) \setminus f}\mu_{f_l \to x}(x)$\;
+                    }
+                }
+                \ForEach{edge $e=(x,f) \in \mathcal E$ where $x \in \mathcal V$ and $f \in \mathcal F$}
+                {
+                    \If{$f$ has received all messages}
+                    {
+                        $\mu_{f \to x}(x) \leftarrow \max_{\text{ne}(f) \setminus x}[\log{f(x, \text{ne}(f) \setminus x)} + \sum_{x_m \in \text{ne}(f) \setminus x}\mu_{x_m \to f}(x_m)]$\;
+                        $\phi_{f \to x}(x) \leftarrow \text{argmax}_{\text{ne}(f) \setminus x}[\log{f(x, \text{ne}(f) \setminus x)} + \sum_{x_m \in \text{ne}(f) \setminus x}\mu_{x_m \to f}(x_m)]$
+                    }
+                    
+                }
+            }
+            select a root node $x_{root} \in \mathcal V$\;
+            $x_{root}^* \leftarrow \text{argmax}_{x_{root}}[\sum_{f_l \in \text{ne}(x)}\mu_{f_l \to x}(x)]$\;
+            \While{moving down from root to leaf nodes}
+            {
+                \ForEach{factor $f \in \text{ne}(x)$ where $x$ knows its configuration $x^*$}
+                {
+                    $X_{\text{ne}(f) \setminus x}^* \leftarrow \phi_{f \to x}(x^*)$\;
+                }
+            }
+            \Return{$x*$ for all variable node $x \in \mathcal V$}
+        \end{algorithm}
+
+        We save each values that maximizes the whole probability distribution, to reduce the
+        useless repeated operations when obtaining $\textbf{x}^{\max}$.
+
+        \begin{rem}{Message Passing is a Framework}{messPassFramework}
+            As one can see, by changing the content of the message and the operations, we can yield different algorithms.
+            Sum-product algorithm and max-sum algorithms are the examples. Dijkstra algorithm and max flow
+            algorithm can be interpreted as message passing framework. One would think of the factor graph's absence, but factor graph is only a tool for
+            explaining the message passing framework. For more information, one may search for algebraic path problem and semiring.
+        \end{rem}
+
+\section{Junction Tree Algorithm}
+    \subsection{Introduction}
+        The \textbf{junction-tree algorithm} is an algorithm that calculates marginal distributions like sum-product algorithm.
+        The difference is that it can be applied to any type of graphs, in the expense of computational memories.
+        TODO: Junction Tree Algorithm
+\section{Loopy Belief Propagation Algorithm}\label{sec:loopyBeliefPropAlg}
+    \subsection{Introduction}
+        TODO: Loopy Belief Propagation Algorithm
+        \emph{To be continued....}
+
+\end{document}

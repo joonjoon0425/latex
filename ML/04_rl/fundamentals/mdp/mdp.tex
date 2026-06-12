@@ -1,0 +1,206 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+\chapter{Markov Decision Processes}
+\makeSubfileHeader{Markov Decision Processes}
+
+\section{Introduction}
+    In this chapter, we discuss \textbf{Markov decision process}, a framework that reinforcement learning heavily relys on.
+    Markov decision process is the foundation of reinforcement learning algorithms. We mainly focus on discrete Markov decision process.
+
+    The following property of conditional expectation is used often in this document; for example in the derivation of Bellman equations.
+    \begin{equation}
+        \mathbb{E}[\mathbb{E}[X|Y,Z]|Y]=\mathbb{E}[X|Z] \label{eq:lawOfTotalExpect}
+    \end{equation}
+
+\section{Finite Markov Decision Process}
+    \subsection{Definition}
+        The learner and decision maker is called \emph{agent}, and the \emph{environment} is the thing the agent interacts with.
+        These two interact at each of a sequence of time step $t=0,1,2,3,\dots$.
+        At every time step $t$, the agent receives \emph{state} $S_t \in \mathcal{S}$ of the environment and selects an action
+        $A_t \in \mathcal{A}(s)$ based on that state $s$. Next step, the agent receives a reward $R_{t+1} \in \mathcal{R}$ and finds itself in a new state $S_{t+1}$.
+        The MDP then give rise to the \emph{trajectory} $S_0,A_0,R_1,S_1,A_1,R_2,S_2,A_2,R_3,\dots $.
+        
+        The states, rewards and actions are all have finite number of elements in \emph{finite} MDP. We will mainly discuss about finite MDP.
+        \begin{defn}{Markov Decision Process (MDP)}{finiteMDP}
+            \textbf{Markov decision process} is a tuple of five objects $(\mathcal{S},\mathcal{A}, p, \mathcal{R}, \gamma)$
+            where $\mathcal{S}$, $\mathcal{R}$, and $\mathcal{A}$ are sets of states, rewards, and actions.
+            The function $p:\mathcal{S}\times\mathcal{S}\times\mathcal{A}\to[0,1]$ is called \emph{state-transition probability}
+            and defined as
+            \[
+            p(s'|s,a)=\mathbb{P}\{S_t=s'|S_{t-1}=s,A_{t-1}=a\} = \sum_{r \in \mathcal{R}}p(s',r|s,a).
+            \]
+            The function $p(s',r|s,a)=\mathbb{P}\{S_t=s',R_t=r|S_{t-1}=s,A_{t-1}=a\}$ is called \emph{dynamics} of the MDP.
+            $\gamma \in [0,1]$ is called \emph{discount rate}, and is used to calculate the expected value of cummulative rewards, namely the \emph{return}
+            and the expectation of it is what the agent has to maximize. The return is defined as
+            \[
+            G_t=R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}.
+            \]
+            Note that the goal can be written in recursive manner; $G_t = R_{t+1} + \gamma G_{t+1}$.
+        \end{defn}
+    \subsection{Markov Property}
+        The important property of Markov decision process is that $R_t$ and $S_t$ depends only on previous state and action; $S_{t-1}$ and $A_{t-1}$.
+        This is called \textbf{Markov property}. More formally, the Markov property can be defined as following;
+        \begin{defn}{Markov Property}{markovProp}
+            Let $S_t$, $R_t$ and $A_t$ be the state, reward and action at time $t$. Then, the probability distribution satisfies \textbf{Markov property} if
+            \begin{equation*}
+            P\{S_t=s',R_t=r|S_{t-1}=s_{t-1}, A_{t-1}=a_{t-1},\dots,S_0=s_0,A_0=a_0\}
+            = P\{S_t=s',R_t=r|S_{t-1}=s_{t-1}, A_{t-1}=a_{t-1}\}
+            \end{equation*}
+            for all $s',s_i \in \mathcal{S}$, $r \in \mathcal{R}$ and $a_i \in \mathcal{A}$.
+        \end{defn}
+
+\section{Episodic Task and Continuing Task}
+    The \emph{return} $G_t=R_{t+1} + \gamma^2R_{t+2} + R_{t+3} + \dots$, presented in Definition \ref{defn:finiteMDP} shortly, is the value which we should maximize about expectation.
+    The return may consist of finite rewards, or it can be formulated as an infinite sum.
+    
+    When the agent-environment interaction can break naturally into subsequences, for example winning the chess game and starting it all again from the start,
+    we call these subsequences \textbf{episodes}. All the episodes terminate in the special state called \textbf{terminal state}.
+    Then, the return can be expressed in finite sum;
+    \[
+    G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots + \gamma^{T-1}R_T
+    \] 
+    where the time of termination, $T$ is a random variable that normally varies from episode to episode and $0 \leq \gamma \leq 1$ is the discount rate.
+    The states other than teminal state is often written as $\mathcal{S}$, and all the states including terminal state is often written as $\mathcal{S}^+$.
+
+    When the agent-environment interaction cannot be expressed in terms of episodes, we call it \textbf{continuing task}. The return now cannot be formulated as finite sum;
+    \begin{align}
+        G_t &= \sum_{k=0}^{\infty}\gamma^k R_{t+k+1} \\
+            &= R_{t+1} + \gamma G_{t+1}
+    \end{align}
+    This equation still holds when the task is episodic; We can set $G_T=0$ for terminal time $T$.
+
+    The episodic and continuing tasks can be expressed in unified notation by using special \emph{absorbing state} which transitions only to itself and generates only zero rewards.
+    Then the return can be expressed as
+    \[
+    G_t = \sum_{k=t+1}^{T}\gamma^{k-t-1}R_k
+    \]
+    with possibility $T=\infty$ and $\gamma = 0$, but not both.
+
+\section{Policies and Value Functions}
+    Now we introduce \emph{value functions} which represents the estimate of \emph{how good} it is for the agent to be in a given state
+    or to perform a given action in a given state. The 'how good' is expressed in terms of expectations of returns.
+    \subsection{Definitions}
+        \begin{defn}{Policy}{policy}
+            The \textbf{policy} $\pi(a|s)$ is a mapping from states to probablities of selecting each possible action, where $a \in \mathcal{A}(s)$.
+        \end{defn}
+        If the agent is following policy $\pi(a|s)$ at time $t$, the probability of selecting $A_t = a$ in $S_t=s$ is $\pi(a|s)$.
+        \begin{defn}{Value Function}{valueFunc}
+            The \textbf{value function} $v_\pi(s)$ of a state $s$ is the expected return when starting in $s$ and follwing policy $\pi$, i.e.,
+            \[
+            v_\pi(s) = \mathbb{E}_\pi[G_t|S_t=s] = \mathbb{E}_\pi\left[ \sum_{k=0}^{\infty}\gamma^kR_{t+k+1}\middle|S_t=s \right]
+            \]
+            where $\mathbb{E}_\pi$ denotes the expected value of a random variable given that the agent follows policy $\pi$.
+            The function $v_\pi$ itself is called \textbf{state-value function for policy} $\pi$.
+        \end{defn}
+        The value of terminal state is always 0.
+        \begin{defn}{Action-Value Function}{actionValueFunc}
+            The \textbf{action-value function} $q_\pi(s,a)$ is the expected return starting from state $s$, taking the action $a$,
+            and then following policy $\pi$.
+            \[
+            q_\pi(s,a) = \mathbb{E}_\pi[G_t|S_t=s,A_t=a] = \mathbb{E}_\pi\left[ \sum_{k=0}^{\infty}\gamma^kR_{t+k+1}\middle|S_t=s,A_t=a \right]
+            \]
+        \end{defn}
+        Note that the value function and action-value function has following relationship:
+        \begin{thm}{Relationship of Value Function and Action-Value Function}{relVFAVF}
+            The state-value fuction $v_\pi(s)$ and action-value function $q_\pi(s,a)$ satisfies following property:
+            \begin{align*}
+            v_\pi(s) &= \sum_{a \in \mathcal{A}(s)}\pi(a|s)q_\pi(s,a) \\
+            q_\pi(s,a) &= \mathbb{E}[R_{t+1} + \gamma v_\pi(S_{t+1})|S_t=s,A_t=a]
+            \end{align*}
+            
+        \end{thm}
+        \begin{proof}
+            Use the equation \ref{eq:lawOfTotalExpect}. The second equation can be derived using equation \ref{eq:lawOfTotalExpect} with the Markov property. Note that the expectation is taken about policies.
+        \end{proof}
+
+        These functions can be estimated from experience. This type of estimation method is one of Monte Carlo methods.
+        When there are too much states and actions or when they are continuous, we can approximated the function using parametrized approximator, such as deep neural network.
+    
+    \subsection{Bellman Equation}
+        The fundamental property of value functions that are used throughout reinforcement learning and dynamic programming is that they satisfy recursive relationship,
+        called \textbf{Bellman equation} for $v_\pi$.
+        \begin{thm}{Bellman Expectation Equation for $v_\pi$}{bellmanEqForVal}
+            Let $v_\pi$ be a state-value function for policy $\pi$. Then the $v_\pi$ satisfies following equation;
+            \begin{align}
+                v_\pi(s) &= \mathbb{E}_\pi[G_t|S_t=s]
+                \\ &= \mathbb{E}_\pi[R_{t+1} + \gamma G_{t+1} | S_t = s]
+                \\ &= \sum_{a \in \mathcal{A}(s)} \pi(a|s)\sum_{s'}\sum_rp(s',r|s,a)\big[r + \gamma\mathbb{E}_\pi[G_{t+1}|S_{t+1}=s'] \big]
+                \\ &= \sum_{a \in \mathcal{A}(s)} \pi(a|s)\sum_{s', r}p(s',r|s,a)[r + \gamma v_\pi(s')], \text{ for all } s \in \mathcal{S}
+            \end{align}
+            which is called the \textbf{Bellman equation} for $v_\pi$.
+        \end{thm}
+        The actions $a$ are taken from $\mathcal{A}(s)$. The sum can be understood as expectation, since it is a sum over all
+        three variables $a$, $s$, and $r$. It is just a sum of returns $r + \gamma v_\pi(s')$ multiplied by the probability $\pi(a|s)p(s',r|s,a)$.
+
+        The following is the Bellman equation for action-value function.
+        \begin{thm}{Bellman Expectation Equation for $q_\pi$}{bellmanEqForAct}
+            Let $q_\pi$ be an action-value function for policy $\pi$. Then $q_\pi$ satisfies following equation;
+            \begin{align}
+                q_\pi(s,a) &= \mathbb{E}_\pi[G_t|S_t=s, A_t=a]
+                \\ &= \mathbb{E}_\pi[R_{t+1} + \gamma G_{t+1} | S_t = s, A_t = a]
+                \\ &= \sum_{s', r} p(s',r|s,a) \big[ r + \gamma \mathbb{E}_\pi[G_{t+1}|S_{t+1}=s'] \big]
+                \\ &= \sum_{s', r} p(s',r|s,a) \big[ r + \gamma v_\pi(s')\big]
+                \\ &= \sum_{s', r} p(s',r|s,a) \left[ r + \gamma \sum_{a' \in \mathcal{A}(s')} \pi(a'|s') q_\pi(s',a') \right], \text{ for all } s \in \mathcal{S}, a \in \mathcal{A}(s)
+            \end{align}
+            which is called the \textbf{Bellman equation} for $q_\pi$.
+        \end{thm}
+        Note that we used law of total expectation; check \ref{eq:lawOfTotalExpect}.
+
+\section{Optimal Policies and Optimal Value Functions}
+    \subsection{Definition}
+        Value functions define a partial ordering over policies. We denote $\pi \geq \pi'$ if and only if $v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal{S}$.
+        The \textbf{optimal policy} is a policy that is better than or equal to all other policies. There is always at least one optimal policy.
+        There can be more than one optimal policies, but they all share the
+        same state-value function, namely the \emph{optimal state-value function} and the same \emph{optimal action-value function}.
+        \begin{defn}{Optimal State-Value Function}{optStateValFunc}
+            Let $v_\pi$ be a state-value function. Then, the \textbf{optimal state-value function} $v_*$ is defined as
+            \[
+            v_*(s) = \max_\pi{v_\pi(s)}
+            \]
+            for all $s \in \mathcal{S}$.
+        \end{defn}
+        \begin{defn}{Optimal Action-Value Function}{optActValFunc}
+            Let $q_\pi$ be a action-value function. Then, the \textbf{optimal action-value function} $q_*$ is defined as
+            \[
+            q_*(a,s) = \max_\pi{q_\pi(a,s)}
+            \]
+            for all $s \in \mathcal{S}$ and $a \in \mathcal{A}(s)$.
+        \end{defn}
+    \subsection{Bellman Optimality Equation}
+    The optimal functions presented above also satisfies the Bellman equation, called the \textbf{Bellman optimality equation};
+    \begin{thm}{Bellman Optimality Equation}{bellOptEq}
+        Let $v_*$ and $q_*$ be optimal state-value function and optimal action-value function. Then, these functions satisfy the following \textbf{Bellman optimality equation};
+        \begin{align}
+            v_*(s) &= \max_{a \in \mathcal{A}}q_*(s,a) \\
+            &= \max_a \mathbb{E}[R_{t+1} + \gamma v_*(S_{t+1})|S_t=s,A_t=a] \\
+            &= \max_a \sum_{s',r}p(s',r|s,a)[r + \gamma v_*(s')]\\
+            q_*(s,a) &= \mathbb{E}[R_{t+1} + \gamma \max_{a'}q_*(S_{t+1},a')|S_t=s,A_t=a] \\
+            &= \sum_{s',r}p(s',r|s,a)[r + \gamma \max_{a'}q_*(s',a')]
+        \end{align}
+    \end{thm}
+    Note that we used following relationship between optimal functions;
+    \begin{thm}{Relationship Between Optimal Functions}{relOptFunc}
+        Let $v_*$ and $q_*$ be optimal state-value function and optimal action-value function. Then, these functions satisfy the following relationship;
+        \begin{equation}
+            v_*(s)=\max_{a \in \mathcal{A}(s)}q_*(s,a)
+        \end{equation}
+
+        Moreover, following holds for optimal policy $\pi_*$;
+        \begin{equation}
+            \pi_*(s) = \arg\max_{a \in \mathcal{A}(s)}q_*(s,a)
+        \end{equation}
+    \end{thm}
+    \begin{proof}
+        The proof for first equation uses $a=b \Leftrightarrow  a \leq b \text{ and } b \leq a$. The second equation can be proved using the first equation.
+    \end{proof}
+
+    Once one has $v_*$, determining an optimal policy is straightforward. We just have to make one step along, and then find out the actions that satisfy the Bellman optimality equation.
+    We then create the policy that allocates positive probability only to these actions. 
+    This \emph{greedy} selection seems that it ignores possibility of better alternatives in the long run. However, note that we are trying to maximize the \emph{return}, which
+    condsiders a long-run cummulative sum, and the optimal functions are derived using this return. Thus, we do not have to worry about the better alternatives.
+
+    Having $q_*$, it is even more strightforward to create an optimal policy. We don't even have to take a step ahead; since we can always find
+    optimal action $a$, for any given state $s$.
+    
+\end{document}

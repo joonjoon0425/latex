@@ -1,0 +1,64 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Parameter Initialization}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    We introduce some ways of initializing parameters. One may think like "Is it that important? Can't we just initialize it randomly?".
+    But if we just randomly initialize it, we have two problems:
+    \begin{enumerate}
+        \item \textbf{Vanishing Gradient};
+        \item \textbf{Exploding Gradient}.
+    \end{enumerate}
+    Actually this problems arise due to activation functions, not randomly intialized parameters.
+    We explain it more on next section.
+\section{Main Ideas}
+    \subsection{Vanishing and Exploding Gradients}
+        Let's look at the backpropagation equation (the chain rule).
+        \[
+            \frac{\partial f}{\partial x_1} =
+            \frac{\partial f}{\partial x_n}\frac{\partial x_n}{\partial x_{n-1}}\dots\frac{\partial x_2}{\partial x_1}
+        \]
+        The values are multiplied on and on. The point is that if we use activation functions such as $\sigma(\dot)$, the sigmoid,
+        the gradient values between 0 and 1 are keep multiplied. This will result in very small gradients if the network if very deep,
+        and float arithmetic won't be able capture the value. This is the \textbf{vanishing gradient problem}.
+        Even if the gradients being multiplied is fairly big enough, this may \textbf{lead to exploding gradient problem}.
+        The forward pass also can suffer from very big or small values, since the values are kept multiplied and added by big or small values.
+
+    \subsection{Xavier Intialization}
+        \textbf{Xavier initialization}, or \textbf{Glorot initialization} (Glorot \& Bengio, 2010), is a way to initialize weights,
+        which relaxes the problems shown before. This method is derived if we try to maintain the variances of gridients during backward pass
+        and input vectors during forward pass constant. For more information, see Glorot \& Bengio, 2010.
+        \begin{defn}{Xavier Initialization}{xavierInit}
+            Let $n_{in}$ be the number of input dimension of the layer and let $n_{out}$ be the number of output dimension of the layer.
+            The \textbf{Xavier normal initialization} is to pick the weight from following normal distribution:
+            \[
+            \mathcal{N}(0, \sigma^2),\ \text{where}\ \sigma^2 = \sqrt{\frac{2}{n_{in}+n_{out}}}.
+            \]
+            \textbf{Xavier uniform initialization} is to pick the weight from following uniform distribution:
+            \[
+            \mathcal{U}\left(-\sqrt{\frac{6}{n_{in}+n_{out}}},\ \sqrt{\frac{6}{n_{in}+n_{out}}}\right).
+            \]
+        \end{defn}
+        The uniform distribution is the one proposed on the paper. The Xavier initialization works well on tanh and sigmoid function, but not on
+        ReLU. The other method, \textbf{He initialization} (He et al., 2015), is told to work better on ReLU activations.
+
+    \subsection{He Initialization}
+        \begin{defn}{He Initialization}{heInit}
+            Let $n_{in}$ be the input dimension of the layer. Than, we pick the weights from following normal distribution:
+            \[
+            \mathcal{N}\left(0,\ \frac{2}{n_{in}}\right).
+            \]
+        \end{defn}
+        This method, like Xavier initialization, can be derived from trying to maintain the variances constant.
+    
+    \subsection{Put more methods if you learned other one!}
+
+\end{document}

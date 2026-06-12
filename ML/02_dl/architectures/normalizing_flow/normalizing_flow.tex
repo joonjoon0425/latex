@@ -1,0 +1,164 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Normalizing Flow}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    \textbf{Normalizing flow} is a nonlinear latent variable model, where the likelihood can be evaluated without approximation,
+    while sampling is still straightforward. The idea is to model a flexible probability distribution through an invertible neural network.
+\section{Main Idea}
+    \subsection{Normalizing Flow}
+        The normalizing flow uses deep neural network to transform the probability distribution of latent variable to
+        data distribution. Suppose $p_z(z)$ is a simple probability distribution, for example, a Gaussian distribution.
+        To evaluate the likelihood of $\tb x = \tb f(\tb z,\tb w)$, the distribution $p(\tb x|\tb w)$, we can use
+        change of variables formula. To use the change of variables formula, we require that $\tb f(\tb z,\tb w)$
+        to be invertible about $\tb z$ for everu value of $\tb w$. If we denote the inverse of $\tb f(\tb z,\tb w)$
+        as $\tb g(\tb z,\tb w)$, we get
+        \[
+        p_{\tb x}(\tb x|\tb w)=p_{\tb z}(\tb g(\tb x,\tb w))\|D\tb g(\tb x)\|
+        \]
+        where $D\tb g(\tb x)$ denotes the Jacobian of $\tb g$, and its elements are given by
+        $D\tb g_{ij}(\tb x)=\frac{\partial g_i(\tb x,\tb w)}{\partial x_j}$.
+
+        One consequence of forcing invertible network is that the dimension of $\tb x$ and $\tb z$ equals.
+        Notice that invertible functions are still invertible when they are composed, so we can create invertible layers to create flexible, invertible network.
+        There are several techniques for constructing an invertible neural network.
+    
+    \subsection{Invertible Layeres}
+        The layers are mainly forward passes, from input data to latent variables.
+        \subsubsection{Linear Flow}
+            The simplest invertible network is \textbf{linear function}. But since it takes $\mathcal{O}(D^3)$ times to invert the $D \times D$ matrix,
+            we parametrize it directly with LU decomposition;
+            \[
+            \tb W = \tb{PL}(\tb U + \tb D)
+            \]
+            where $\tb P$ is a fixed permutation matrix, $\tb L$ is a lower triangular matrix, $\tb U$ is a upper triangular matrix with zeros on the diagonal, and $\tb D$ is a diagonal matrix.
+            Using this parametrization, $\tb W$ is invertible in $\mathcal{O}(D^2)$.
+
+            However notice that linear flow has poor expressive capability.
+
+        \subsubsection{Elementwise Flow}
+            The simplest nonlinear flow is \textbf{elementwise flow}. Elementwise flow applies a nonlinear invertible function pointwise;
+            \[
+            \tb f(\tb h, \tb w)=\begin{bmatrix} f(h_1, \tb w) \\ \vdots \\ f(h_D, \tb w) \end{bmatrix}
+            \]
+            where $f(\cdot, \tb w)$ is a pointwise invertible function for all values of parameter $\tb w$.
+            The Jacobian of elementwise flow is diagonal, so the determinant of it is just the product of diagonal entries.
+
+            However elementwise flow cannot express the correlation between features, since they do not mix features. So we use it with
+            linear flow, or \emph{coupling flow} which will be explained right after.
+
+        \subsubsection{Coupling Flow}
+            The \textbf{coupling flow} retain the invertability of a linear transformation while allowing flexibilty.
+            It divides the input $\tb h$ into two parts $\tb h = \begin{bmatrix}\tb h_1 \\ \tb h_2\end{bmatrix}$ and create the flow.
+            \begin{defn}{Coupling Flow}{coupFlow}
+                Let $\tb h=\begin{bmatrix} \tb h_1 \\ \tb h_2 \end{bmatrix}$. Then, the coupling flow $\tb f(\tb h, \tb w)$ with parameter $\tb w(\cdot)$
+                that takes $\tb h_1$ as input is defined as
+                \[
+                    \tb f(\tb h, \tb w) =
+                    \begin{bmatrix}
+                        \tb h_1 \\
+                        \tb g(\tb h_2, \tb w(\tb h_1))
+                    \end{bmatrix}
+                \]
+                where $\tb g(\cdot, \tb w)$ is an invertible layer for all values of $\tb w$.
+            \end{defn}
+            
+            The point is that $\tb w(\cdot)$ does not have to be invertible. It can be any kind of function, CNN, attention layer, or any other networks.
+            The invertion of $f(\tb h, \tb w)=\begin{bmatrix} \tb h_1' \\ \tb h_2' \end{bmatrix}$ is given as
+            \[
+                \begin{bmatrix}
+                    \tb h_1' \\
+                    \tb g^{-1}(\tb h_2',\tb w(\tb h_1'))
+                \end{bmatrix}
+            \]
+
+            Since the transform of second half of the parameters only depend on the first half of parameters, it does not represent sufficient correlation between
+            features. We solve this problem by applying random permutation and shuffle the inputs, between layers.
+
+            
+
+        \subsubsection{Autoregressive Flow}
+            \textbf{Autoregressive flow} is a generalization of coupling flow.
+            \begin{defn}{Autoregressive Flow}{autoregFlow}
+                Let $\tb h=\begin{bmatrix} h_1 \\ \vdots \\ h_D\end{bmatrix}$ be the input vector
+                and let $\tb h_{a:b} = \begin{bmatrix} h_a \\ \vdots \\ h_b\end{bmatrix}$.
+                Then, the \textbf{autoregressive flow} $\tb f(\tb h, \tb w)$ is defined as
+                \[
+                f_i(\tb h, \tb w) = g(h_i,\bm w(\tb h_{1:i - 1}))
+                \]
+                where \emph{transformer} $g(\cdot, \tb h)$ is an invertible function,
+                and parameters $\tb w, \tb w(\tb h_1), \tb w(\tb h_1, \tb h_2)\dots$ are
+                called \emph{conditioners}.
+            \end{defn}
+            The term transformer has nothing to do with the architecture transformer that uses attention mechanism. This network can be evaluated parallel by masking the
+            unused values, instead of really dividing the inputs and looping.
+
+            The inversion is quite inefficient since it cannot be done in parallel.
+            Let $\begin{bmatrix}
+                h_1' \\
+                h_2' \\
+                \vdots \\
+                h_n'
+            \end{bmatrix}$ 
+            = $\begin{bmatrix}
+                g(h_1, \tb w) \\
+                g(h_2, \tb w(h_1)) \\
+                \vdots \\
+                g(h_n, \tb w(\tb h_{1:n-1}))
+            \end{bmatrix}$. The the inversion is given as
+            \begin{align*}
+                h_1 &= g^{-1}(h_1', \tb w) \\
+                h_2 &= g^{-1}(h_2', \tb w(h_1)) \\
+                &\vdots \\
+                h_n &= g^{-1}(h_n', \tb w(\tb h_{1:n-1})) \\
+            \end{align*}
+
+            Hence, the sampling is very slow. If we use an autoregressive flow that flows from latent space to input data space,
+            the sampling would be fast, but the evaluation of likelihood will be slow this time. This is called as an \textbf{inverse autoregressive flow}
+            To enable both direction to be fast and efficient, is to first train masked autoregressive flow and use this to learn inverse autoregressive flow. 
+
+
+\section{Extensions of Normalizing Flow}
+    \subsection{Multi-scale Flow}
+        The constraint of the normalizing flow is that the dimensionality of latent space and data space must be equal.
+        This causes very costly computations when high-dimensional dataset such as images are given. To resolve this, we use
+        \tb{multi-scale flows}, which partitions the input data and gradually fix the data, so that the computational cost decreases as the flow goes on.
+
+        In the sampling process, we pick a sample from deepest layer, and pass it through network until the variable which we fixed during training process is met.
+        Then we pick a sample again from the distribution of the latent variable which we fixed during trainig process, and concatenate it to the original sample.
+        We repeat this until we reach the input data layer.
+    \subsection{Continuous Normalizing Flow}
+        Instead of applying discrete network layers, we can increse the number of layers to $\infty$ and make it into continuous flow.
+        The flow of initial latent distribution $\tb z(0) \sim p_0(\tb z)$ to final data distribution $\tb z(T) = \tb x \sim p_T(\tb x)$ is given as
+        \[
+        \tb z(T) = \tb z(0) + \int_{0}^{T}\tb f(\tb z(t), \tb w)dt.
+        \]
+        Then, the following holds due to the \emph{instantaneous change of variables}
+        \[
+        \frac{d\log{p_t(\tb z(t))}}{dt} = -\text{Tr}\left( \frac{d\tb f(\tb z(t), \tb w)}{d\tb z(t)} \right).
+        \]
+        The log-likelihood is then given as
+        \[
+        \log{p_T(\tb x)}=\log{p_0(\tb z(0))}-\int_{0}^{T}\text{Tr}\left( \frac{d\tb f(\tb z(t), \tb w)}{d\tb z(t)} \right)dt
+        \]
+        As you can see, the main advantage of CNF is that the likelihood requires the trace of Jacobian instead of determinant.
+        This is efficient, but we can make it even more efficient by using \emph{Hutchinson's trace estimator},
+        \[
+        \text{Tr}(\tb A) = \mathbb{E}_{\bm\epsilon}[\bm\epsilon^\top\tb A \bm\epsilon]
+        \]
+        where $\bm\epsilon$ is a random vector whose ditribution has zero mean and unit covariance,
+        and we approximate the estimator using a finite number of samples.
+        Moreover, the network function $\tb f$ can consist of any network layer, which may not be invertible.
+        The only constraint is that the dimension of input vector and output vectors must equal. It is possible to increase and decrease the dimension during the flow.
+
+        The CNF can be trained using the adjoint sensitivity method, like Neural ODE of residual networks. See \href{run:../residual_connection/residual_connection.pdf}{this document}
+        However, this is still slow, and \textbf{flow matching} can be used to overcome this drawback.
+\end{document}

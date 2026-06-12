@@ -1,0 +1,111 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Expectation-Maximization Algorithm}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    We discuss about \textbf{Expectation-Maximization algorithm} (EM algorithm) in detail.
+    EM algorithm is used to find the MLE or MAP of a given likelihood function with a latent variable.
+    We derive and explain EM algorithm only for discrete latent variables, but EM for continuous variables can be derived in the same way,
+    exchanging summation with integration.
+
+\section{Main Idea}
+    \subsection{Intuition}
+        Let \textbf{X} be a dataset in which the $n$-th row represents $\textbf{x}_n^{\top}$,
+        and let \textbf{Z} be lantent variables in which the $n$-th row represents $\textbf{z}_n^{\top}$.
+        Representing $\bm\theta$ as the model parameter, the log likelihood function is given by
+        $\log{p(\textbf{X}|\bm\theta)}=\log{\left\{ \sum_{\textbf{Z}}p(\textbf{X},\textbf{Z}|\bm\theta) \right\}}$.
+        
+        Maximizing the log likelihood is straightforward if all variables are observed. However, the latent variables are
+        hardly known. The information we can get about latent variable is the posterior distribution $p(\textbf{Z}|\textbf{X},\bm\theta)$.
+        So, instead of maximizing the whole log likelihood, we maximize the expectation of log-likelihood under the posterior distribution of 
+        latent variables. Calculating the expectation is the \textbf{E step} of the EM algorithm.
+        The subsequent step, the \textbf{M step} of the EM algorithm, then maximizes the expectation calculated at the E step.
+        These pair of steps give rise to the revised estimate of parameters $\bm\theta$.
+        
+    \subsection{Algorithm}
+        \begin{algorithm}[H]
+            \DontPrintSemicolon
+            \SetArgSty{textnormal}
+            \SetKwInOut{Input}{Input}
+            \SetKwInOut{Output}{Output}
+            
+            \caption{EM algorithm}
+
+            \Input{joint distribution $p(\textbf{X},\textbf{Z}|\bm\theta)$ \newline
+            initial parameters $\bm\theta^{(\text{old})}$ \newline
+            dataset \textbf{X}}
+            \Output{Final parameters $\bm\theta$}
+
+            \BlankLine
+            \hrule
+
+            \Repeat{convergence}
+            {
+                \tcp{E step}
+                $\mathcal{Q}(\bm\theta,\bm\theta^{(\text{old})}) \leftarrow \sum_{\textbf{Z}}p(\textbf{Z}|\textbf{X},\bm\theta^{(\text{old})})\log{p(\textbf{X},\textbf{Z}|\bm\theta)}$\;
+                \tcp{M step}
+                $\bm\theta^{(\text{new})} \leftarrow \arg\max_{\bm\theta}{\mathcal{Q}(\bm\theta,\bm\theta^{(\text{old})})}$\;
+                $\bm\theta^{(\text{old})} \leftarrow \bm\theta^{(\text{new})}$\;
+                $\mathcal{L} \leftarrow \log{p(\textbf{X}|\bm\theta)}$\;
+            }
+            \Return{$\bm\theta^{(\text{new})}$}
+        \end{algorithm}
+
+        If we want to use the prior distribution $p(\bm\theta)$ of parameter $\bm\theta$, we slightly modify the algorithm;
+        we change M step so that it maximizes $\mathcal{Q}(\bm\theta,\bm\theta^{(\text{old})}) + \log{p(\bm\theta)}$.
+
+    \subsection{Evidence Lower Bound}
+        EM algorithm can be seen at another perspective, called \textbf{Evidence lower bound} (ELBO). The ELBO plays important role in
+        modern deep generative models and \emph{variational inferences}.
+
+        \subsubsection{Decomposition of Likelihood}
+            Let $q(\textbf{Z})$ be a distribution over the latent variables. Then, the following decomposition holds for log likelihoods;
+            \begin{thm}{Decomposition of log-likelihood Function}{decompLogLike}
+                Let $p(\textbf{X}|\bm\theta)$ be a likelihood of dataset \textbf{X}. Let $q(\textbf{Z})$ be a distribution over the latent variables.
+                Then, the following holds;
+                \[
+                \log{p(\textbf{X}|\bm\theta)}=\mathcal{L}(q,\bm\theta) + \text{KL}(q\|p)
+                \]
+                where
+                \[
+                \mathcal{L}(q,\bm\theta)=\sum_{\textbf{Z}}q(\textbf{Z})\log{\left\{ \frac{p(\textbf{X},\textbf{Z}|\bm\theta)}{q(\textbf{Z})} \right\}}
+                \text{ and }
+                \text{KL}(q\|p)=-\sum_{\textbf{Z}}q(\textbf{Z})\log{\left\{ \frac{p(\textbf{Z}|\textbf{X},\bm\theta)}{q(\textbf{Z})} \right\}}.
+                \]
+            \end{thm}
+
+            Notice that the KL-divergence is always non-negative, i.e., $\text{KL}(q\|p) \geq 0$. Using this, we can derive the following useful result:
+            $\mathcal{L}(q,\bm\theta)$ provides the lower bound for log-likelihood such that $\mathcal{L}(q,\bm\theta) \leq \log{p(\textbf{X}|\bm\theta)}$.
+
+        \subsubsection{EM Revisited}
+            We can derive EM algorithm using Theorem \ref{thm:decompLogLike}. We first maximize the lower bound $\mathcal{L}(q,\bm\theta^{(\text{old})})$ about $q(\textbf{Z})$,
+            fixing the parameter as $\theta^{(\text{old})}$. Since the parameter is fixed, the log-likelihood stays fixed and does not fluctuate as $q(\textbf{Z})$ changes.
+            So, to maximize $\mathcal{L}(q,\bm\theta^{(\text{old})})$, we minimize the KL-divergence, which can be accomplished when $q(\textbf{Z})=p(\textbf{Z}|\textbf{X},\bm\theta^{(\text{old})})$.
+            We now maximize lower bound about $\bm\theta$ with fixed $q(\textbf{Z})$ this time. Since lower bound increases and the KL-divergence is non-negative since
+            $q(\textbf{Z})$ is fixed while $\bm\theta$ is modified, this will increase the log-likelihood.
+            Substituting $q(\textbf{Z})=p(\textbf{Z}|\textbf{X},\bm\theta^{(\text{old})})$ into the equation about lower bound of
+            Theorem \ref{thm:decompLogLike}, we get
+            \begin{align*}
+            \mathcal{L}(q,\bm\theta) &= \sum_{\textbf{Z}}p(\textbf{Z}|\textbf{X},\bm\theta^{(\text{old})})\log{p(\textbf{X},\textbf{Z}|\bm\theta)}
+            -\sum_{\textbf{Z}}p(\textbf{Z}|\textbf{X},\bm\theta^{(\text{old})})\log{p(\textbf{Z}|\textbf{X}, \bm\theta^{(\text{old})})}
+            \\ &=\mathcal{Q}(\bm\theta,\bm\theta^{(\text{old})}) + \text{const}
+            \end{align*}
+            where the constant is independent of $\bm\theta$. Then, the E step corresponds to maximizing $\mathcal{L}(q,\bm\theta)$ about $q(\textbf{Z})$
+            and the M step corresponds to maximizing $\mathcal{L}(q,\bm\theta)$ about $\bm\theta$.
+
+\section{Extensions of EM Algorithm}
+    \subsection{Generalized EM Algorithm}
+        When the model gets complex, the E step or M step, or both, can be intractable. So, instead of directly maximizing $\mathcal{L}(q,\bm\theta)$ with respect to $\bm\theta$,
+        we try to make the lower bound increase by modifying $\bm\theta$. For example, we can use gradient based algorithms in M step.
+
+    \subsection{Sequential EM Algorithm}
+        \emph{To be continued...}
+\end{document}

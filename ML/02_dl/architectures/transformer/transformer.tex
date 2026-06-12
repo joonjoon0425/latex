@@ -1,0 +1,207 @@
+\documentclass{article}
+\input{~/studies/preamble}
+
+\title{Transformer}
+\author{Hyoung Joon, Kim}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+    The \textbf{transformer} architecture was originally introduced for NLP (Natural Language Processing)
+    , and surpasses the RNN (Recurrent Neural Network), which was the mainstream of NLP. Transformers can
+    process various types of data, even if it was developed for NLP. For example, ViT (vision transformers)
+    often outperform CNN in image processing tasks.
+
+    Transformers has following merits:
+    \begin{itemize}
+        \item Effective in transfer learning: The transformer can be trained on large dataset, and then can be fine-tuned for downstream tasks.
+        \item Well-suited to massive parallel processors such as GPUs. This accelerates training and inference process of transformers, which RNN cannot do.
+        \item Shares parameters, which leads to more efficient memory usage than ordinary full-connected layer.
+    \end{itemize}
+
+\section{Main Ideas}
+    \subsection{Attention}
+        The transformer is based on the \textbf{attention} mechanism. The attention calculates how much the data must
+        take \emph{attention} to other data. For example, consider following two sentences:
+        \begin{align*}
+            &\text{I swam across the river to get to the bank.} \\
+            &\text{I walked across the road to get cash from the bank.}
+        \end{align*}
+        The word \emph{bank} has different interpretation in two sentences, and this difference
+        can be found from other words in each setence:
+        \begin{itemize}
+            \item The meaning of the bank in first sentence can be induced from \emph{swam} and \emph{river}.
+            \item The meaning of the bank in second sentence can be induced from \emph{cash}.
+        \end{itemize}
+        So, to process this sentences, one must estimate the amount of \emph{attention} that words take on each other words.
+        
+        \subsubsection{Dot-product Self-attention}
+            Now we discuss the precise structure of the heart of the transformer architecture, the attention mechanism.
+
+            \begin{defn}{Dot-product Self-attention}{dotProdSelfAtten}
+                Let $\textbf{X}$ be $N \times D$ matrix, which consists of $N$ $D \times 1$ data vectors.
+                Then, the \textbf{dot-product self-attention} \textbf{Sa}, which is an $N \times D_v$ matrix, is defined as following:
+                \[
+                \textbf{Sa}[\textbf{X}]=\textbf{Softmax}\left( \textbf{Q}\textbf{K}^{\top}\right)\textbf{V}
+                \]
+                where \textbf{V}, \textbf{Q}, \textbf{K}, called value, query and key, is defined as following:
+                \begin{align*}
+                    \textbf{V} &= \textbf{1}\bm{\beta}_v^{\top} + \textbf{X}\textbf{W}_v^{\top} \\
+                    \textbf{Q} &= \textbf{1}\bm{\beta}_q^{\top} + \textbf{X}\textbf{W}_q^{\top} \\
+                    \textbf{K} &= \textbf{1}\bm{\beta}_k^{\top} + \textbf{X}\textbf{W}_k^{\top}
+                \end{align*}
+                
+                \begin{itemize}
+                    \item $\textbf{W}_v$, $\bm{\beta}_v$ have dimensionality $D_v \times D$ and $D_v \times 1$, respectively.
+                    \item $\textbf{W}_q$, $\bm{\beta}_q$ have dimensionality $D_q \times D$ and $D_q \times 1$, respectively.
+                    \item $\textbf{W}_k$, $\bm{\beta}_k$ have dimensionality $D_k \times D$ and $D_k \times 1$, respectively.
+                \end{itemize}
+                
+                \textbf{1} is an $N \times 1$ vector. 
+                $D_v$ governs the size of the output vectors.
+                The \textbf{Softmax} function applies ordinary softmax function to each row, respectively.
+            \end{defn}
+            The key represents the information which the value is holding.
+            The query represents what value is asking to other values, required to understand its meaning in the whole data.
+            If the query and key matches well then the dot product will produce large value.
+            If not, the dot product result will be small. This is the 'attention'.
+
+            This is quite unintuitive at first look, so let's get some intuition of these equations.
+
+        \subsubsection{Intuition of the Attention Mechanism}
+            The motivation of the attention is to calculate the amount of attention the data pays to every other data,
+            which can be expressed as following:
+            \[
+            \textbf{y}_n = \sum_{m=1}^{N}a_{nm}\textbf{x}_m
+            \]
+            with data $\{\textbf{x}_1 \dots \textbf{x}_N\}$.
+            The $a_{nm}$ is \emph{attention weight}, and we can interpret this as how much the $\textbf{x}_n$ pay attention to $\textbf{x}_m$.
+            If $a_{nm}$ is high, then $\textbf{x}_n$ is highly related, or pays attention, to $\textbf{x}_m$.
+            If it is not, then the relevancy is low.
+            To let the $a_{nm}$ represent the amount of attention in reasonable way, 
+            we would like to constrain the attention weights
+            in the following way:
+            \begin{align*}
+                a_{nm} & \geq 0, \\
+                \sum_{m=1}^{N}a_{nm} & = 1.
+            \end{align*}
+            Now, one of the simple way of caculating $a_{nm}$ is to take the dot product of $\textbf{x}_n$ and $\textbf{x}_m$.
+            But, we can make it more flexible by introducing the \textbf{query} and \textbf{key} vectors;
+            \begin{align*}
+                \textbf{q}_n &= \bm{\beta}_q + \textbf{W}_q\textbf{x}_n \\
+                \textbf{k}_m &= \bm{\beta}_k + \textbf{W}_k\textbf{x}_m
+            \end{align*}
+
+            Now we must caculate how much the query should pay attention to the key value. We use softmax function to meet the requirements we
+            considered earlier;
+            \[
+                a_{nm} = \frac{\exp \textbf{q}_n^\top \textbf{k}_m}
+                {\sum_{i=1}^{N} \exp{\textbf{q}_n^\top \textbf{k}_i}}
+            \]
+
+            Now we transform the vector $\textbf{x}_m$ to $\textbf{v}_m$, by following equation:
+            \[
+                \textbf{v}_m = \bm{\beta}_v + \textbf{W}_v\textbf{x}_m
+            \]
+            where $\bm{\beta}_v$ and $\textbf{W}_v$ are bias and weights, respectively.
+            Since the original data can be difficult to directly recognize the relevance, we are transforming it.
+            
+            So, the final output is
+            \[
+                \textbf{y}_n = \sum_{m=1}^{N} \frac{\exp \textbf{q}_n^\top \textbf{k}_m}
+                {\sum_{i=1}^{N} \exp{\textbf{q}_n^\top \textbf{k}_i}} \textbf{v}_m
+            \]
+
+            \begin{rem}{Summary of the meaning of each matrices}{attenSumm}
+                To summarize, the following are the meaning of each matrices:
+                \begin{itemize}
+                    \item $\textbf{q}_n$: The question that $\textbf{v}_n$ asks to other key.
+                    \item $\textbf{k}_n$: The information that $\textbf{v}_n$ is holding.
+                    \item the attention weight $a_{nm} = \dfrac{\exp \textbf{q}_n^\top \textbf{k}_m}{\sum_{i=1}^{N} \exp{\textbf{q}_n^\top \textbf{k}_i}}$
+                    : the amount of attention that $\textbf{v}_n$ is paying to $\textbf{v}_m$.
+                    \item $\textbf{y}_n = \sum_{m=1}^{N} \dfrac{\exp \textbf{q}_n^\top \textbf{k}_m}
+                    {\sum_{i=1}^{N} \exp{\textbf{q}_n^\top \textbf{k}_i}} \textbf{v}_m$: Newly created context which is easier to interpret.
+                    The amount of attention that $\textbf{v}_n$ is paying to other data is compressed in.
+                \end{itemize}
+            \end{rem}
+            TODO
+            \begin{rem}{}{attenMat}
+            Added to ease understanding of the matrix notation of attention mechanism :
+            \[
+            \]
+            \end{rem}
+
+\section{Extensions of Attention}
+    The following extensions are used very often when using attention mechanism.
+    \subsection{Scaled Dot-product Self-attention}
+        The dot product in attention mechanism can have large magnitude, and the softmax function will going to produce
+        very small gradient value for that dot product result. So we resize the value that softmax function receives by
+        dividing with square root of the dimension of query vector (which must be same as key vector's dimension);
+        \begin{defn}{Scaled Dot-product Self-attention}{scaledDPSA}
+            Let $D_k$ be the dimension of query vector (which equals key vector). Then the scaled dot-product self-attention is given as
+            \[
+            \textbf{Sa}[\textbf{X}]=\textbf{Softmax}\left(\frac{\textbf{Q}\textbf{K}^{\top}}{\sqrt{D_k}}\right)\textbf{V}
+            \]
+        \end{defn}
+        This is called \textbf{scaled dot-product self-attention}.
+        
+    \subsection{Multi-head Attention}
+        The self-attention mechanism make use of same parameter for each input data.
+        This may decrease the expressive power of the attention, and does not consider
+        the situation where various context must be used.
+        To prevent this, we use multiple value, query, and key weights.
+        We produce attention result in parallel with each weights and then concatenate them.
+        This is called \textbf{multi-head attention}.
+        \begin{defn}{Multi-head Attention}{multiHeadAtten}
+            Let $X$ be an $N \times D$ matrix.
+            Let $\textbf{W}_v^h \in \mathbb{R}^{D_v \times D}$, $\textbf{W}_q^h \in \mathbb{R}^{D_k \times D}$,
+            and $\textbf{W}_k^h \in \mathbb{R}^{D_k \times D}$ be the weights of $h$-th attention mechanism or \textbf{head}.
+            Let $\bm{\beta}_v^h \in \mathbb{R}^{D_v}$, $\bm{\beta}_q^h \in \mathbb{R}^{D_k}$,
+            and $\bm{\beta}_k^h \in \mathbb{R}^{D_k}$ be the biases of $h$-th head.
+            We calculate $h$-th value, query, and key as:
+            \begin{align*}
+                \textbf{V}_h &= \textbf{1}(\bm{\beta}_v^h)^{\top} + \textbf{X}(\textbf{W}_v^h)^{\top}\\
+                \textbf{Q}_h &= \textbf{1}(\bm{\beta}_q^h)^{\top} + \textbf{X}(\textbf{W}_q^h)^{\top}\\
+                \textbf{K}_h &= \textbf{1}(\bm{\beta}_k^h)^{\top} + \textbf{X}(\textbf{W}_k^h)^{\top}
+            \end{align*}
+            Then, each head can be written as:
+            \[
+                \textbf{Sa}_h[\textbf{X}]=\textbf{Softmax}\left(\frac{\textbf{Q}_h\textbf{K}_h^{\top}}{\sqrt{D_k^h}}\right)\textbf{V}_h
+            \]
+            The multi-head attention is defined as follows;
+            \[
+                \textbf{MhSA}[\textbf{X}] = [\textbf{Sa}_1[\textbf{X}], \dots, \textbf{Sa}_H[\textbf{X}]]\textbf{W}
+            \]
+            where \textbf{W} is another weight matrix, and $H$ is the number of heads.
+        \end{defn}
+        If the number of heads is $H$, each $D_v$ is usually chosen to be equal to $D/H$.
+
+    \subsection{Positional Encoding}
+        As the structure of the attention mechanism shows, the attention mechanism itself is equivariant to
+        permutation of input values. However, the sequential information is important in NLP. To overcome this,
+        we can inject a positional information into the input itselt, without modifying the attention mechanism.
+        This can be described as
+        \[
+        \tilde{\tb x}_n = \tb x_n + \tb r_n
+        \]
+        where $\tb r_n$ is a given positional encoding.
+
+        The following is a technique of positional encoding that uses sinusoidal functions.
+        \begin{defn}{Sinusoidal Positional Encoding}{sinPosEnc}
+            For a given position $n$, the position-encoding vector has components $r_{ni}$ given by
+            \[
+            r_{ni} = \begin{cases}
+            \sin{\left(\dfrac{n}{L^{i/D}}\right)} \text{ if $i$ is even,}\\
+            \cos{\left(\dfrac{n}{L^{(i-1)/D}}\right)} \text{ if $i$ is odd}
+            \end{cases}
+            \]
+        \end{defn}
+        This encoding can be thought of a continuous version of how binary numbers are represented.
+        The lower the digit, the higher its frequency.
+
+
+\end{document}
