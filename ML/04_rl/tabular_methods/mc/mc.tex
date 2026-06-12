@@ -1,0 +1,91 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+\chapter{Monte Carlo Methods}
+\makeSubfileHeader{Monte Carlo Methods}
+
+\section{Introduction}
+    In this chapter, the Monte Carlo methods are discussed. Unlike DP, Monte Carlo does not
+    require a perfect MDP model. Monte Carlo learns from experience, or simulated experience,
+    if a model is ready.
+
+    Monte Carlo methods are ways of solving reinforcement problem based on averaging sample returns.
+    Unfortunately, the Monte Carlo method can be used only on episodic tasks.
+
+\section{Monte Carlo Prediction}
+    When a policy is given, we can estimate a state-value function of the policy by \textbf{Monte Carlo prediction}.
+    Monte Carlo prediction averages the sample value of desired states and use it as the estimate of state-value function.
+    The averaging is done when each episode terminates, unlike ordinary DP method which updates in each step.
+    This idea of sampling and averaging the returns underlies all Monte Carlo methods.
+
+    Precisely, Monte Carlo prediction are devided into two methods; \emph{first-visit MC method} and \emph{every-visit MC method}.
+    The former one estimates $v_\pi(s)$ as the average of the returns first visits to $s$. The latter one averages the returns following all visits to $s$.
+    These two MC methods are very similar but have slightly different theoretical properties.
+
+    \Algorithm{firstVisitMCPredict}
+    {First-Visit MC Prediction, for estimating $v_\pi$}
+    {\inputitem{$\pi$}{a given policy}}
+    {\inputitem{$V \simeq v_\pi$}{an estimate of $v_\pi$}}
+    {
+        \tcp{initialize}
+        $V(s) \in \mathbb{R} \leftarrow \text{arbitrary values, for all } s \in \mathcal{S}$\;
+        $R(s) \leftarrow \text{empty list, for all } s \in \mathcal{S}$\;
+
+        \Repeat{convergence}
+        {
+            generate an episode following $\pi$: $S_0, A_0, R_1, S_1, A_1, \dots, S_{T-1}, A_{T-1}, R_T$\;
+            $G \leftarrow 0$\;
+            \ForEach{step of episode, $t = T-1, T-2, \dots, 1, 0$}
+            {
+                $G \leftarrow \gamma G + R_{t+1}$\;
+                \tcp{in every-visit MC method, this if statement is ignored}
+                \If{$S_t$ did not appear in $S_0, S_1, S_2, \dots, S_{t-1}$}
+                {
+                    append $G$ to $R(s)$\;
+                    $V(S_t) \leftarrow average(R(s))$\;
+                }
+            }
+        }
+    }
+
+    Due to the law of large numbers, the first-visit MC method and every-visit MC method converges to $v_\pi(s)$ as the number of visits to $s$ goes to infinity.
+
+    Note that the MC method does not bootstrap; DP method uses values of other states when estimating a value of a given state. MC does not.
+    Due to this property of MC method, MC method is useful when one requires only values of a subset of states.
+
+\section{Monte Carlo Estimation of Action Values}
+    If a model is not available, it is particularly useful to estimate action values rather than state values,
+    since we do not know which action gives better return when a model is unavailable.
+    The value we estimate now changes from $v_\pi(s)$ to $q_\pi(s,a)$. We just have to change state to state-action pair in algorithm \ref{alg:firstVisitMCPredict}.
+    
+    The only complication is that many state-action pairs won't be visited. If $\pi$ is a deterministic policy, we cannot get the
+    values of action rather than $\pi(s)$. The problem of \emph{exploiting and exploring} rises here again. One way to maintain the exploration is to
+    make the episode start with desired state-action pair, and every state-action pair has nonzero probability of being selected.
+    We call this the assumption of \emph{exploring starts}. It is useful, but notice that it cannot be used in all situations; we cannot manually set the
+    start when interacting with real-life environment.
+
+\section{Monte Carlo Control}
+    After the evaluation of policy, we can improve our policy, as we did in DP. The difference is that we have action-value function $q_\pi(s,a)$ instead of $v_\pi(s)$.
+    This means that we do not need model to figure out the greedy policy.
+
+    \subsection{Policy Improvement}
+        For policy improvement, we select a greedy policy with respect to current action-value function $q_\pi(s,a)$.
+        \begin{equation}
+            \pi'(s) = \arg\max_a q_\pi(s,a)
+        \end{equation}
+
+        Note that this new policy $\pi'$ satisfies the conditions of policy improvement theorem;
+        \begin{align}
+            q_{\pi}(s, \pi'(s)) &= \max_a{q_{\pi}(s,a)} \\
+            &\geq q_{\pi}(s, \pi(s)) \\
+            &\geq v_\pi(s).
+        \end{align}
+
+    \subsection{Dealing with Infinite Iterations}
+
+    \subsection{Algorithms}
+    % add Monte Carlo ES algorithm
+    % add On-policy first visit MC Control for \epsilon-soft polices algorithm
+
+
+\end{document}
