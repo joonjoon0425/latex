@@ -29,7 +29,7 @@
     {
         \tcp{initialize}
         $V(s) \in \mathbb{R} \leftarrow \text{arbitrary values, for all } s \in \mathcal{S}$\;
-        $R(s) \leftarrow \text{empty list, for all } s \in \mathcal{S}$\;
+        $Ret(s) \leftarrow \text{empty list, for all } s \in \mathcal{S}$\;
 
         \Repeat{convergence}
         {
@@ -41,7 +41,7 @@
                 \tcp{in every-visit MC method, this if statement is ignored}
                 \If{$S_t$ did not appear in $S_0, S_1, S_2, \dots, S_{t-1}$}
                 {
-                    append $G$ to $R(s)$\;
+                    append $G$ to $Ret(s)$\;
                     $V(S_t) \leftarrow average(R(s))$\;
                 }
             }
@@ -81,11 +81,334 @@
             &\geq v_\pi(s).
         \end{align}
 
-    \subsection{Dealing with Infinite Iterations}
-
     \subsection{Algorithms}
-    % add Monte Carlo ES algorithm
-    % add On-policy first visit MC Control for \epsilon-soft polices algorithm
+        \subsubsection{Monte Carlo Control with Exploring Start}
+            \Algorithm{MCControlWithES}
+            {Monte Carlo Control with Exploring Start}
+            {\inputitem{$\pi_0$}{initial policy}}
+            {\inputitem{$q_*$}{optimal action-value function} \\
+            \inputitem{$\pi_*$}{optimal policy}}
+            {
+                \tcp{intialize}
+                $Q(s,a) \in \mathbb{R} \leftarrow \text{arbitrary, for all } s \in \mathcal{S}, a \in \mathcal{A}(s)$\;
+                $Ret(s,a) \leftarrow \text{empty list, for all } s \in \mathcal{S}$\;
 
+                \Repeat{convergence}
+                {
+                    $S_0 \sim \mathcal{S}$, uniformly\;
+                    $A_0 \sim \mathcal{A}(S_0)$, uniformly\;
+                    Generate an episode starting from $S_0,A_0$, following $\pi$: $S_0,A_0,R_1,S_1,A_1,\dots,S_{T-1},A_{T-1},R_T$\;
+                    $G \leftarrow 0$\;
+                    \ForEach{step of episode, $t=T-1,T-2,\dots,1,0$}
+                    {
+                        $G \leftarrow \gamma G + R_{t+1}$\;
+                        \tcp{in every-visit MC method, this if statement is ignored}
+                        \If{the pair $S_t,A_t$ did not appear in $S_0,A_0,S_1,A_1,\dots,S_{t-1},A_{t-1}$}
+                        {
+                            append $G$ to $Ret(S_t,A_t)$\;
+                            $Q(S_t,A_t) \leftarrow avg(Ret(S_t,A_t))$\;
+                            $\pi(S_t) \leftarrow \arg\max_a{Q(S_t,a)}$\;
+                        }
+                    }
+                }
+                \Return{$Q,\pi$}
+            }
+            One can easily show that algorithm \ref{alg:MCControlWithES} converges to optimal policy. If it converges to suboptimal policy, the value function won't be optimal,
+            and it will cause the policy to change.
+        
+        \subsubsection{Monte Carlo Control without Exploring Start}
+            The following algorithm does not use the exploring start method. The algorithm resolves problem of maintaining exploration by using non-deterministic policy.
+            In this algorithm, $\epsilon$-greedy policy is used as the non-deterministic policy.
 
+            Before presenting the algorithm, we make a definition of $\varepsilon$-soft policy.
+            \begin{defn}{$\varepsilon$-soft Policy}{epsSoftPolicy}
+                The $\bm{\epsilon}$\textbf{-soft policy} $\pi$ is a policy satisfying following condition;
+                \[
+                    \pi(a|s) \geq \frac{\epsilon}{|\mathcal{A}(s)|}
+                \]
+            \end{defn}
+
+            \Algorithm{onPolicyFirstVisitMCControl}
+            {On-Policy First-Visit Monte Carlo Control}
+            {\inputitem{$\epsilon > 0$}{small positive number for probability of choosing non-greedy action}\\
+            \inputitem{$\pi$}{initial $\varepsilon$-soft policy}}
+            {\inputitem{$q_*$}{optimal action-value function}\\
+            \inputitem{$\pi$}{optimal policy}}
+            {
+                \tcp{intialize}
+                $Q(s,a) \in \mathbb{R} \leftarrow \text{arbitrary, for all } s \in \mathcal{S}, a \in \mathcal{A}(s)$\;
+                $Ret(s,a) \leftarrow \text{empty list, for all } s \in \mathcal{S}$\;
+
+                \Repeat{convergence}
+                {
+                    Generate an episode following $\pi$: $S_0,A_0,R_1,S_1,A_1,\dots,S_{T-1},A_{T-1},R_T$\;
+                    $G \leftarrow 0$\;
+                    \ForEach{step of episode, $t=T-1,T-2,\dots,1,0$}
+                    {
+                        $G \leftarrow \gamma G + R_{t+1}$\;
+                        \tcp{in every-visit MC method, this if statement is ignored}
+                        \If{the pair $S_t,A_t$ did not appear in $S_0,A_0,S_1,A_1,\dots,S_{t-1},A_{t-1}$}
+                        {
+                            append $G$ to $Ret(S_t,A_t)$\;
+                            $Q(S_t,A_t) \leftarrow avg(Ret(S_t,A_t))$\;
+                            $A_* \leftarrow \arg\max_a{Q(S_t,a)}$\;
+                            $\pi(a|S_t) \leftarrow
+                            \begin{cases}
+                                1 - \epsilon + \frac{\epsilon}{|\mathcal{A}(S_t)|} &\text{if $a=A_*$}\\
+                                \frac{\epsilon}{|\mathcal{A}(S_t)|} &\text{if $a\neq A_*$}
+                            \end{cases}
+                            $
+                        }
+                    }
+                }
+                \Return{$Q,\pi$}
+            }
+            We can show that this algorithm works well by showing that $\epsilon$-greedy algorithm satisfies conditions of
+            policy improvement theorem over all $\varepsilon$-soft policies;
+            \begin{proof}
+                Let $\pi$ be any $\varepsilon$-soft policy. Let $\pi'$ be $\epsilon$-greedy policy. Then,
+                \begin{align}
+                    q_\pi(s,\pi'(s))
+                    &=\sum_a \pi'(a|s)q_\pi(s,a) \\
+                    &=\frac{\epsilon}{|\mathcal{A}(s)|}\sum_a q_\pi(s,a) + (1-\epsilon)\max_a{q_\pi(s,a)} \\
+                    &\geq \frac{\epsilon}{|\mathcal{A}(s)|}\sum_a q_\pi(s,a) + (1-\epsilon)\sum_a \frac{\pi(a|s)-\frac{\epsilon}{|\mathcal{A}(s)|}}{1-\epsilon}q_\pi(s,a) \label{weightedAvg} \\
+                    &=v_\pi(s)
+                \end{align}
+            \end{proof}
+            Note that we used that the maximum is always bigger than weighted average with weights that sum to 1 in line \ref{weightedAvg}.
+            The equality can hold only when $\pi'$ and $\pi$ are both optimal policy among the $\varepsilon$-soft policies. This can be proved by using the
+            uniqueness of the solution of Bellman optimal equation of state-value function.
+
+    \subsection{Dealing with Infinite Iterations}
+        The algorithms shown earlier assumes that the loop is repeated infinitely. However, it is impossible to repeat
+        forever in real world. Two methods can be used to relax the infinite loop condition.
+        \begin{enumerate}
+            \item Hold the idea of approximating $q_\pi$; This idea was used along almost all algorithms we saw.
+            \item Give up trying to approximate $q_\pi$; This is the idea of GPI. One extreme example of this method is value iteration of DP method.
+                We may not get the precise state value in certain time step, but the final result is still optimal.
+        \end{enumerate}
+\section{Off-policy Monte Carlo Method}
+    \subsection{Introduction}
+        The dilemma of reinforcement learning is always this: exploit or explore. One of the way of solving this dilemma is to use \textbf{off-policy} method.
+        
+        Off-policy method uses two policy, one which is learned about and becomes optimal policy and one that is more exploratory and us used to generate behavior.
+        The policy being learned is called \textbf{target policy}, and the policy used to generate behavior is called \textbf{behavior policy}.
+
+        To use episodes generated by behavior policy $b$ to estimate values for target policy $\pi$, following condition must be satisfied.
+        \begin{defn}{Assumption of Coverage}{assumCov}
+            Let $\pi$ be a target policy and $b$ a behavior policy. Then, the following \textbf{assumption of coverage} must be satisfied.
+            \begin{equation}
+                \pi(a|s) > 0 \Rightarrow b(a|s) > 0
+            \end{equation}
+        \end{defn}
+        That is, we require that every action taken under $\pi$ is also taken, at least occasionally, under $b$.
+
+    \subsection{Importance Sampling}
+        Almost all off-policy method uses \textbf{importance sampling} method. A general introduction to importance sampling method is given in this \href{run:../../../03_bayesian_ml/inference/sampling/sampling.pdf}{document}.
+        Suppose that we generated an episode starting with state $S_t$, and got the state-action trajectory $A_t, S_{t+1}, A_{t+1},\dots,S_T$.
+        Then, the probability of the trajectory occuring under policy $\pi$ is
+        \begin{align}
+            \mathbb{P}\{A_t, S_{t+1}, A_{t+1}, \dots, S_T &| S_t, A_{t:T-1} \sim \pi \} \\
+            &= \pi(A_t|S_t)p(S_{t+1}|S_t, A_t)\pi(A_{t+1}|S_{t+1})\cdots p(S_T|S_{T-1},A_{T-1}) \\
+            &= \prod_{k=t}^{T-1}\pi(A_k|S_k)p(S_{k+1}|S_k,A_k)
+        \end{align}
+        Similarly, the probabilty of the trajectory occuring under policy $b$ is $\prod_{k=t}^{T-1}b(A_k|S_k)p(S_{k+1}|S_k,A_k)$.
+        Then, the \textbf{importance-sampling ratio} $\rho_{t:T-1}$ is defined as following;
+        \begin{defn}{Importance-sampling Ratio of Target and Behavior Policy}{impSampRatio}
+            Let $\pi$ and $b$ be the target and behavior policy, respectively. Then, the \textbf{importance-sampling ratio}
+            $\rho_{t:T-1}$ is defined as
+            \begin{equation}
+                \rho_{t:T-1}=\frac{\prod_{k=t}^{T-1}\pi(A_k|S_k)p(S_{k+1}|S_k,A_k)}{\prod_{k=t}^{T-1}b(A_k|S_k)p(S_{k+1}|S_k,A_k)}
+                =\prod_{k=t}^{T-1}\frac{\pi(A_k|S_k)}{b(A_k|S_k)}
+            \end{equation}
+        \end{defn}
+        Then, the expected return (values) are calculated by multiplying the $\rho_{t:T-1}$ to the returns $G_t$ due to the policy $b$.
+        \begin{equation}
+            \E[\rho_{t:T-1}G_t|S_t=s] = v_\pi(s)
+        \end{equation}
+
+    \subsection{Off-policy Monte Carlo Prediction}
+        Now we apply the off-policy method to Monte Carlo prediction. We define some notations here.
+        \begin{itemize}
+            \item $\mathfrak{T} (s)$: the set of all time steps in which state $s$ is visited.
+            \item $T(t)$: the first time of termination following time $t$.
+        \end{itemize}
+        Using these notations, $\{G_t\}_{t \in \mathfrak{T} (s)}$ are the returns that pertain to state $s$ and $\{\rho_{t:T(t)-1}\}_{t \in \mathfrak{T} (s)}$ are the corresponding
+        importance-sampling ratios.
+
+        There are two ways of estimating the value. First is the \textbf{ordinary importance sampling} and the second is \textbf{weighted importance sampling}.
+        The first method estimates value as
+        \begin{equation}
+            V(s) = \frac{\sum_{t \in \mathfrak{T} (s)}\rho_{t:T(t)-1}G_t}{|\mathfrak{T} (s)|}.
+        \end{equation}
+        The second method estimates value as
+        \begin{equation}
+            V(s) = \frac{\sum_{t \in \mathfrak{T} (s)}\rho_{t:T(t)-1}G_t}{\sum_{t \in \mathfrak{T} (s)}\rho_{t:T(t)-1}}.
+        \end{equation}
+
+        The ordinary estimator is always $v_\pi$ in the expectation (unbiased) but can be extreme,
+        and the weighted estimator may produce $v_b$ in the expectation (when only a one sample is observed)
+        but the variance is bounded.
+
+        Following is the table of biasedness and unboundedness of variance of each method.
+        
+        \begin{center}
+            \begin{tabularx}{10cm}{cXX}
+                \toprule
+                & ordinary & weighted \\
+                \midrule
+                first-visit & unbiased, unbounded & biased, bounded \\
+                \midrule
+                every-visit & biased, unbounded & biased, bounded \\
+                \bottomrule
+            \end{tabularx}
+        \end{center}
+        Since the states in every-visit method is correlated, the estimator is biased, but is asymptotically unbiased as the number of sample grows.
+        In practice, the weighted estimator usually has dramatically lower variance and is strongly preferred.
+        \subsubsection{Incremental Implementation}
+            Incremental implementation can be used in off-policy Monte Carlo Prediction as we did in bandit problem.
+            The difference is that the update occurs episode by episode, not step by step.
+            
+            The incremental implementation of ordinary importance sampling is simple, since we just have to replace the reward to the weighted return
+            of the algorithm \ref{alg:increSampleAverage}.
+
+            Weighted importance sampling can also be implemented incrementally. Let $G_1,G_2,\dots,G_{n-1}$ be a sequence of returns, all starting in same state $s$,
+            each with a corresponding weight $W_i = \rho_{t_i:T(t_i)-1}$ where $t_i$ denotes the time when state $s$ occured, with return $G_i$.
+            Let the weighted estimate of value of $s$ be $V_n(s)=\frac{\sum_{k=1}^{n-1}W_kG_k}{\sum_{k=1}^{n-1}W_k}$. The update rule for $V_n(s)$ is 
+            \begin{equation}
+                V_{n+1}(s) = V_n(s) + \frac{W_n}{C_n}\Big[ G_n - V_n \Big]
+            \end{equation}
+            where
+            \begin{equation}
+                C_{n+1} = C_n + W_{n+1},
+            \end{equation}
+            with $C_0=0$.
+
+            \Algorithm{offPolicyMCPrediction}
+            {Off-policy Monte Carlo Prediction}
+            {\inputitem{$\pi$}{target policy}}
+            {\inputitem{$q_\pi$}{action-value function of policy $\pi$}}
+            {
+                \tcp{initialize}
+                \ForEach{$(s,a)$ where $s\in\mathcal{S}, a\in\mathcal{A}(s)$}
+                {
+                    $Q(s,a) \in \mathbb{R} \leftarrow \text{arbitrary}$\;
+                    $C(s,a) \leftarrow 0$\;
+                }
+                \Repeat{convergence}
+                {
+                    $b \leftarrow $ any policy satisfying assumption of coverage with $\pi$\;
+                    Generate an episode following $b$: $S_0, A_0, R_1, \dots, S_{T-1}, A_{T-1}, R_T$\;
+                    $G \leftarrow 0$\;
+                    $W \leftarrow 1$\;
+                    \For{$t \in T-1, T-2, \dots, 0$, while $W \neq 0$}
+                    {
+                        $G \leftarrow \gamma G + R_{t+1}$\;
+                        $C(S_t,A_t) \leftarrow C(S_t,A_t) + W$\;
+                        $Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \frac{W}{C(S_t,A_t)}[G - Q(S_t,A_t)]$\;
+                        $W \leftarrow W \frac{\pi(A_t|S_t)}{b(A_t|S_t)}$
+                    }
+                }
+                \Return{$Q$}
+            }
+
+    \subsection{Off-policy Monte Carlo Control}
+        Now we present the off-policy Monte Carlo control method. The target policy $\pi$ and behavior policy $b$ are used,
+        and the assumption of coverage is satisfied. To assure that every possible state-action pair is visited, we set $b$ to be 
+        an $\varepsilon$-soft policy. $\pi$ is a deterministic policy.
+        
+        \Algorithm{offPolicyMCControl}
+        {Off-policy Monte Carlo Control}
+        {\inputitem{}{}}
+        {\inputitem{$q_*$}{optimal action-value function} \\
+        \inputitem{$\pi_*$}{optimal policy}}
+        {
+            \tcp{intialize}
+            \ForEach{$(s,a)$ where $s\in\mathcal{S}, a\in\mathcal{A}(s)$}
+            {
+                $Q(s,a) \in \mathbb{R} \leftarrow \text{arbitrary}$\;
+                $C(s,a) \leftarrow 0$\;
+                $\pi(s) \leftarrow \arg\max_a Q(s,a)$\;
+            }
+            \Repeat{convergence}
+            {
+                $b \leftarrow$ any $\varepsilon$-soft policy\;
+                Generate an episode following $b$: $S_0, A_0, R_1, \dots, S_{T-1}, A_{T-1}, R_T$\;
+                $G \leftarrow 0$\;
+                $W \leftarrow 1$\;
+                \For{$t \in T-1, T-2, \dots, 0$}
+                {
+                    $G \leftarrow \gamma G + R_{t+1}$\;
+                    $C(S_t,A_t) \leftarrow C(S_t,A_t) + W$\;
+                    $Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \frac{W}{C(S_t,A_t)}[G - Q(S_t,A_t)]$\;
+                    $\pi(S_t) \leftarrow \arg\max_a Q(S_t,a)$\;
+                    \If{$A_t \neq \pi(S_t)$}
+                    {
+                        exit inner loop (proceed to next episode)\;
+                        \tcp{since the policy pi is deterministic, pi(S)!=A leads to zero weight.}
+                    }
+                    $W \leftarrow W \frac{1}{b(A_t|S_t)}$\;
+                }
+            }
+            \Return{$Q\simeq q_*$, $\pi \simeq \pi_*$}
+        }
+
+        Note that since $\pi$ is deterministic, the weight $W$ is zero if $A_t \neq \pi(S_t)$ in any time step $t$.
+        Multiplying $\frac{1}{b(A_t|S_t)}$ instead of $\frac{\pi(A_t|S_t)}{b(A_t|S_t)}$ will seem reasonable now.
+
+\section{Reducing Variance of Estimators}
+    \subsection{Discount-aware Importance Sampling}
+        The off-policy method we dicussed earlier uses importance-sampling, without taking into account the internal structure of
+        return. \textbf{Discount-aware importance sampling} uses this structure to reduce the variance of off-policy estimators.
+
+        The idea is to think of $\gamma$, the discount rate, as the probability of termination.
+        We define \emph{flat partial returns} $\bar{G}_{t:h} = R_{t+1} + R_{t+2} + \cdots + R_h$ where $0 \leq t < h \leq T$. $h$ is called \emph{horizon}.
+        Then, the conventional return can be written as
+        \begin{align}
+            G_t &= R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots + \gamma^{T-t-1}R_T \\
+            &= (1-\gamma)R_{t+1} \\
+            &+ (1-\gamma)\gamma(R_{t+1}+R_{t+2}) \\
+            &+ (1-\gamma)\gamma^2(R_{t+1}+R_{t+2}+R_{t+3}) \\
+            &\vdots \\
+            &+ (1-\gamma)\gamma^{T-t-2}(R_{t+1}+R_{t+2}+\cdots+R_{T-1}) \\
+            &+ \gamma^{T-t-1}(R_{t+1}+R_{t+2}+\cdots+R_T) \\
+            &= (1-\gamma)\sum_{h=t+1}^{T-1}\gamma^{h-t-1}\bar{G}_{t:h} + \gamma^{T-t-1}\bar{G}_{t:h}
+        \end{align}
+        Now, we define two estimators analogous to ordinary and weighted importance-sampling estimators, with importance-sampling ratio
+        truncated similarly.
+        \begin{align}
+            V(s) &= \frac{\sum_{t \in \mathfrak{T}(s)}\left((1-\gamma)\sum_{h=t+1}^{T(t)-1}\gamma^{h-t-1}\rho_{t:h-1}\bar{G}_{t:h} + \gamma^{T(t)-t-1}\rho_{t:T(t)-1}\bar{G}_{t:T(t)}\right)}{|\mathfrak{T}(s)|}
+            \\
+            V(s) &=
+            \frac
+            {\sum_{t \in \mathfrak{T}(s)}\left((1-\gamma)\sum_{h=t+1}^{T(t)-1}\gamma^{h-t-1}\rho_{t:h-1}\bar{G}_{t:h} + \gamma^{T(t)-t-1}\rho_{t:T(t)-1}\bar{G}_{t:T(t)}\right)}
+            {\sum_{t \in \mathfrak{T}(s)}\left((1-\gamma)\sum_{h=t+1}^{T(t)-1}\gamma^{h-t-1}\rho_{t:h-1} + \gamma^{T(t)-t-1}\rho_{t:T(t)-1}\right)}
+        \end{align}
+        We call these two estimators \textbf{discounting-aware importance sampling estimators}.
+    
+    \subsection{Per-decision Importance Sampling}
+        Lets inspect the weighted return $\rho_{t:T-1}G_t$. It can be writte as the sum of rewards multiplied by discount rate
+        \begin{equation}
+            \rho_{t:T-1}G_t = \rho_{t:T-1}R_{t+1} + \gamma \rho_{t:T-1}R_{t+2} + \gamma^2 \rho_{t:T-1}R_{t+3} + \cdots + \gamma^{T-t-1}\rho_{t:T-1}R_T
+        \end{equation}
+        Note that the first term can be written as $\rho_{t:T-1}R_{t+1} = \frac{\pi(A_t|S_t)\cdots\pi(A_{T-1}|S_{T-1})}{b(A_t|S_t)\cdots b(A_{T-1}|S_{T-1})}R_{t+1}$.
+        The expectations of these factors are all 1.
+        \begin{equation}
+            \E\left[\frac{\pi(A_k|S_k)}{b(S_k|A_k)}\right]=1.
+        \end{equation}
+        With more steps, one can show that
+        \begin{equation}
+            \E[\rho_{t:T-1}R_{t+k}]=\E[\rho_{t:t+k-1}R_{t+k}].
+        \end{equation}
+        Then defining $\tilde{G}_t = \rho_{t:t}R_{t+1} + \gamma \rho_{t:t+1}R_{t+2} + \gamma^2 \rho_{t:t+2}R_{t+3} + \cdots + \gamma^{T-t-1}\rho_{t:T-1}R_T$,
+        it follows that
+        \begin{equation}
+            \E[\rho_{t:T-1}G_t] = \E[\tilde{G}_t].
+        \end{equation}
+        We call this \textbf{per-decision importance sampling}. The estimator analogous to the ordinary importance sampling estimator is
+        \begin{equation}
+            V(s) = \frac{\sum_{t \in \mathfrak{T}(s)}\tilde{G}_t}{|\mathfrak{T}(s)|}
+        \end{equation}
+        which we expect to sometime be of lower variance.
+        There is no obvious per-decision version of weighted importance sampling. The estimators proposed up to today are all non-consistent. (They do not converge to true value even with infinite data.)
 \end{document}

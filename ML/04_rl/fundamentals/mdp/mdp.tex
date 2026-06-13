@@ -147,6 +147,8 @@
         \end{thm}
         Note that we used law of total expectation; check \ref{eq:lawOfTotalExpect}.
 
+        The Bellman expectation equations have unique solution. This can be proved by using the Banach fixed point theorem.
+
 \section{Optimal Policies and Optimal Value Functions}
     \subsection{Definition}
         Value functions define a partial ordering over policies. We denote $\pi \geq \pi'$ if and only if $v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal{S}$.
@@ -202,5 +204,7 @@
 
     Having $q_*$, it is even more strightforward to create an optimal policy. We don't even have to take a step ahead; since we can always find
     optimal action $a$, for any given state $s$.
+
+    The Bellman optimal equations have unique solution. This can be proved by using the Banach fixed point theorem.
     
 \end{document}
