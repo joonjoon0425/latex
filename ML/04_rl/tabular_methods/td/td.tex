@@ -1,0 +1,131 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+\chapter{Temporal-Difference Learning}
+\makeSubfileHeader{Temporal-Difference Learning}
+
+\section{Introduction}
+    \textbf{Temporal-Difference learning} (TD) is one of the central ideas in reinforcement learning.
+    Like DP, TD methods update estimates based in part on other learned estimates. On the other hand, TD methods learn
+    directly from experiences like MC methods. DP, MC, and TD methods' relationships will be kept founded in later chapters.
+    n-step algorithms and TD($\lambda$) algorithms are examples of them.
+
+    The main advantages of TD over MC and DP methods is as following:
+    \begin{itemize}
+        \item Do not have to wait until the epsidoes ends.
+        \item Do not have to ignore or discount episodes on which experimental actions are taken. 
+        \item No model is required.
+    \end{itemize}
+
+\section{TD Prediction}
+    TD method's advantage over MC method is that it can be applied to continuing tasks, since it updates each time step.
+    The simplest form of TD method makes the update
+    \begin{equation}
+        V(S_t) \leftarrow V(S_t) + \alpha \Big[ R_{t+1} + \gamma V(S_{t+1} - V(S_t))\Big] \label{eq:TDUpdate}
+    \end{equation}
+    immediately on transition to $S_t$ receiving $R_{t+1}$. This method is called \textbf{TD(0)}, and is a speacial case of n-step bootstrap and TD($\lambda$).
+
+    \subsection{Algorithm}
+        \Algorithm{tabularTDZeroPred}
+        {Tabular TD(0) Prediction}
+        {\inputitem{$\pi$}{policy to be evaluated} \\
+        \inputitem{$\alpha \in (0,1]$}{step size parameter}}
+        {\inputitem{$v_\pi$}{state-value function of policy $\pi$}}
+        {
+            \tcp{initialize}
+            \ForEach{$s \in \mathcal{S}$}
+            {
+                $V(s) \leftarrow 
+                \begin{cases}
+                    \text{arbitrary value} &\text{if } s \in \mathcal{S^+} \\
+                    0 &\text{if } s \in \mathcal{S} \setminus \mathcal{S^+}
+                \end{cases}$\;
+            }
+            \ForEach{episodes}
+            {
+                $S \leftarrow \text{arbitrary } s \in \mathcal{S^+}$\;
+                \ForEach{step in episode}
+                {
+                    $A \leftarrow$ action given by $\pi$ for $S$\;
+                    take action $A$, receive reward $R$ and next state $S'$\;
+                    $V(S) \leftarrow V(S) + \alpha\big[R + \gamma V(S') - V(S)\big]$\;
+                    $S \leftarrow S'$\;
+                    \If{$S \in \mathcal{S} \setminus \mathcal{S}^+$}
+                    {
+                        break\;
+                    }
+                }
+            }
+            \Return{$V \simeq v_\pi$}
+        }
+
+        Since TD(0) method updates value with existing estimates, we say that it \textbf{bootstraps}, like DP method.
+        TD combines the sampling of MC and bootstrapping of DP, and we call this update as \textbf{sampling update}.
+        Note that it is different from \emph{expected update} of DP.
+
+        \subsubsection{Convergence of the Algorithm}
+            Since TD(0) method uses estimates instead of complete $G_t$, one may be skeptical of its convergence.
+            However, it is known to converge to $v_\pi$, happily. For any fixed policy $\pi$, TD(0) is known to converge to $v_\pi$
+            with constant step-size parameter if it is sufficiently small, and is known to converge to $v_\pi$ with probability 1 if
+            the step-size parameter changes step by step while satisfying the stochastic approximation conditions \ref{thm:condForConv}.
+
+            There is no known answer to the question "If TD and MC both converges to correct answer, then which one converges more quickly?".
+            In practice, TD methods usually converge faster than MC methods on stocahstic tasks.
+
+    \subsection{TD Error}
+        The following definition of \emph{TD error} arises in various forms throughout reinforcement learning:
+        \begin{defn}{TD Error}{TDError}
+            Let $V$ be the estimate of state-value function. Then, the \textbf{TD error} $\delta_t$ at time $t$ is defined as
+            \begin{equation}
+                \delta_t = R_{t+1} + \gamma V(S_{t+1}) - V(S_t)
+            \end{equation}
+        \end{defn}
+        Note that TD error is also contained in algorithm \ref{alg:tabularTDZeroPred}. If the estimate $V$ does not change during the episode,
+        the Monte Carlo error $G_t - V(S_t)$ can be expressed as the weighted sum of TD errors;
+        \begin{equation}
+            G_t - V(S_t) = \sum_{k=t}^{T-1} \gamma^{k-t}\delta_t.
+        \end{equation}
+        Even though $V$ changes during episode, the equation above may still hold approximately if the step size is small enough.
+        Generalization of this idea plays an important role in the theory and algorithms of TD learning. 
+
+    \subsection{Batch Updates on TD}
+        We can apply batch updates to TD(0) methods by computing the increments \ref{eq:TDUpdate} every time step but updating the value
+        after the batch, by the sum of all the increments.
+
+        Very interesting property can be found on batch TD(0) prediction. Batch TD(0) prediction converges to the \textbf{certainty-equivalence estimate}
+        of the MDP. Certainty-equivalence estimate of MDP assumes that the estimate of the MDP is perfect. That is, it is \emph{certain} about its estimate.
+
+        To calculate certainty-equivalence estimate directly, it requires memory complexity of $\mathcal{O}(n^2)$ due to the transition probability table,
+        and time complexity of $\mathcal{O}(n^3)$ due to solving the Bellman equation as the linear system of equations.
+        However, using TD(0) method, it requires memory complexity of only $\mathcal{O}(n)$, to save each values of states, which is a surprising result.
+
+        Meanwhile, batch MC method converges to minimizer of the mean-square error.
+        
+        \begin{rem}{TD(0) Converges to Certainty-equivalence Estimate}
+            Suppose that the algorithm converged to fixed point. Then, the next batch update of value of each state $s$ should be 0.
+            \begin{equation}
+                \sum_{k \in \text{batch}}\sum_{t \in \{t : S_t^k=s\}}\alpha(R_{t+1}^k + \gamma V(S_{t+1}^k) - V(s))=0 \label{eq:rem1}
+            \end{equation}
+            Let $N(s)$ and $N(s,s')$ denote the number of visits of state $s$ in batch and the number of transition from $s$ to $s'$ in batch, respectively.
+            Then, the equation \ref{eq:rem1} can be written as
+            \begin{equation}
+                \left(\sum_{t \in \{t : S_t = s\}} R_{t+1}\right) + \gamma \left( \sum_{s'}N(s,s')V(s') \right) - N(s)V(s) = 0. \label{eq:rem2}
+            \end{equation}
+            Dividing both side of equation \ref{eq:rem2} with $N(s)$, we get
+            \begin{equation}
+                \frac{1}{N(s)}\left( \sum_{t \in \{t : S_t = s\}} R_{t+1}\right) + \gamma \sum_{s'}\frac{N(s,s')}{N(s)}V(s') - V(s) = 0
+            \end{equation}
+            Then, the term $\hat{R}(s) = \frac{1}{N(s)}\left( \sum_{t \in \{t : S_t = s\}} R_{t+1}\right)$ is the average reward of state $s$ and
+            the term $\hat{P}(s'|s) = \frac{N(s,s')}{N(s)}$ is the MLE estimate of transition probability from $s$ to $s'$.
+            Substituting, we get
+            \begin{equation}
+                V(s) = \hat{R}(s) + \gamma \sum_{s'}\hat{P}(s'|s)V(s'),
+            \end{equation}
+            which equals the Bellman equation with certainty-equivalence estimate.
+        \end{rem}
+
+\section{TD Control}
+    \subsection{Sarsa: On-policy TD Control}
+    \subsection{Q-learning: Off-policy TD Control}
+
+\end{document}
