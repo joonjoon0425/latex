@@ -126,6 +126,209 @@
 
 \section{TD Control}
     \subsection{Sarsa: On-policy TD Control}
+        \textbf{Sarsa} is an on-policy TD control algorithm, where its name rises from the quintuple $(S_t,A_t,R_{t+1},S_{t+1},A_{t+1})$,
+        which the algorithm uses. The algorithm estimates $q_\pi(s,a)$ instead of $v_\pi(s)$, which can be done using essentially the same TD method
+        described above.
+
+        Sarsa uses following update;
+        \begin{equation}
+            Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \alpha \Big[ R_{t+1} + \gamma Q(S_{t+1},A_{t+1}) - Q(S_t,A_t) \Big]\label{eq:sarsa}
+        \end{equation}
+        This update is done after every transition from a nonterminal state $S_t$. For terminal state $s$, $Q(s,a)$ is defined as 0.
+
+        \Algorithm{sarsa}
+        {Sarsa}
+        {\inputitem{$\alpha \in (0,1]$}{step size parameter}}
+        {\inputitem{$q_*$}{the optimal policy}}
+        {
+            \tcp{initialize}
+            \ForEach{$(s,a) \in \mathcal{S} \times \mathcal{A}$}
+            {$Q(s,a) \leftarrow
+            \begin{cases}
+                \text{arbitrary,} &\text{ if $s \in \mathcal{S}^+$ and $a \in \mathcal{A}(s)$} \\
+                0 &\text{ if $s \in \mathcal{S} \setminus \mathcal{S}^+$}
+            \end{cases}$\;}
+
+            \ForEach{episodes}
+            {
+                initialize $S$\;
+                choose action $A$ from $S$ using policy derived from $Q$ (e.g. $\varepsilon$-greedy)\;
+                \ForEach{step of episode}
+                {
+                    take action $A$, observe $R$, $S'$\;
+                    choose action $A'$ from $S'$ using policy derived from $Q$ (e.g. $\varepsilon$-greedy)\;
+                    $Q(S,A) \leftarrow Q(S,A) + \alpha \big[ R + \gamma Q(S',A') - Q(S,A) \big]$\;
+                    $S \leftarrow S'$\;
+                    $A \leftarrow A'$\;
+                    \If{$S \in \mathcal{S} \setminus \mathcal{S}^+$}
+                    {
+                        break
+                    }
+                }
+            }
+            \Return{$Q \simeq q_*$}
+        }
+
+        For a Sarsa to converge to optimal policy with probability 1, the policy we use for choosing action must satisfy following property:
+        \begin{itemize}
+            \item All state-action pairs are visited an infinite number of times;
+            \item Policy converges in the limit to the greedy policy (for example, $\varepsilon=1/t$)
+        \end{itemize}
+
     \subsection{Q-learning: Off-policy TD Control}
+        \textbf{Q-learning} is one of the breakthroughs of reinforcement learning. Q-learning uses update:
+        \begin{equation}
+            Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \alpha\Big[ R_{t+1} + \gamma \max_a{Q(S_{t+1}, a)} - Q(S_t,A_t) \Big]
+        \end{equation}
+        In this case, the learned action-value function $Q$ directly estimates the optimal action-value function $q_*$,
+        independent of the policy being followed.
+
+        \Algorithm{qlearning}
+        {Q-learning}
+        {\inputitem{$\alpha \in (0,1]$}{step size parameter}}
+        {\inputitem{$q_*$}{the optimal action-value function}}
+        {
+            \tcp{initialize}
+            \ForEach{$(s,a) \in \mathcal{S} \times \mathcal{A}$}
+            {$Q(s,a) \leftarrow
+            \begin{cases}
+                \text{arbitrary,} &\text{ if $s \in \mathcal{S}^+$ and $a \in \mathcal{A}(s)$} \\
+                0 &\text{ if $s \in \mathcal{S} \setminus \mathcal{S}^+$}
+            \end{cases}$\;}
+
+            \ForEach{episodes}
+            {
+                initialize $S$\;
+                \ForEach{step of episode}
+                {
+                    choose action $A$ from $S$ using behavior policy derived from $Q$ (e.g. $\varepsilon$-greedy)\;
+                    take action $A$, observe $R$, $S'$\;
+                    $Q(S,A) \leftarrow Q(S,A) + \alpha \big[ R + \gamma \max_a{Q(S',a)} - Q(S,A) \big]$\;
+                    $S \leftarrow S'$\;
+                    \If{$S \in \mathcal{S} \setminus \mathcal{S}^+$}
+                    {
+                        break
+                    }
+                }
+            }
+            \Return{$Q \simeq q_*$}
+        }
+
+        For a Q-learning to converge, we do not need additional conditions like Sarsa. What it requires for convergence is
+        to visit and update all state-action pairs, continually.
+
+    \subsection{Expected Sarsa}
+        Instead of choosing only one action for update like Sarsa or Q-learning, expected Sarsa take into account how likely
+        each action is under the current policy. That is, it takes expectation of $Q(s,a)$ given $s$.
+        \begin{align}
+            Q(S_t,A_t)
+            &\leftarrow Q(S_t,A_t) + \alpha\Big[ R_{t+1} + \gamma \E_\pi[Q(S_{t+1}, a) | S_{t+1}] - Q(S_t,A_t) \Big] \\
+            &= Q(S_t,A_t) + \alpha\Big[ R_{t+1} + \gamma \sum_a \pi(a|S_{t+1})Q(S_{t+1},a) - Q(S_t,A_t) \Big] \label{eq:expectedSarsa}
+        \end{align}
+        
+        Expected Sarsa eliminates the variance due to the random selection of $A_{t+1}$. It generally learns better than Sarsa.
+
+        Note that expected sarsa can be both on-policy and off-policy. If we set $\pi$ to be greedy and behavior to be exploratory, the
+        expected Sarsa is exactly Q-learning.
+
+        \Algorithm{expectedSarsa}
+        {Expected Sarsa}
+        {\inputitem{$\alpha \in (0,1]$}{step size parameter}}
+        {\inputitem{$q_*$}{the optimal action-value function}}
+        {
+            \tcp{initialize}
+            \ForEach{$(s,a) \in \mathcal{S} \times \mathcal{A}$}
+            {$Q(s,a) \leftarrow
+            \begin{cases}
+                \text{arbitrary,} &\text{ if $s \in \mathcal{S}^+$ and $a \in \mathcal{A}(s)$} \\
+                0 &\text{ if $s \in \mathcal{S} \setminus \mathcal{S}^+$}
+            \end{cases}$\;}
+
+            \ForEach{episodes}
+            {
+                initialize $S$\;
+                \ForEach{step of episode}
+                {
+                    choose action $A$ from $S$ using behavior policy derived from $Q$ (e.g. $\varepsilon$-greedy)\;
+                    take action $A$, observe $R$, $S'$\;
+                    get desired target policy $\pi$ (e.g. greedy policy, $\varepsilon$-greedy policy with decreasing $\varepsilon$) from current $Q$\;
+                    $Q(S,A) \leftarrow Q(S,A) + \alpha\big[ R + \gamma \sum_a \pi(a|S')Q(S',a) - Q(S,A) \big]$\;
+                    $S \leftarrow S'$\;
+                    \If{$S \in \mathcal{S} \setminus \mathcal{S}^+$}
+                    {
+                        break
+                    }
+                }
+            }
+            \Return{$Q \simeq q_*$}
+        }
+
+    \subsection{Double Learning}
+        \subsubsection{Maximization Bias}
+            All the control algorithms discussed so far all contains maximization operation. For example, Q-learning obviously has max operation,
+            and Sarsa contains maximization in its $\varepsilon$-greedy policy. This maximizaton often suffers from problem called
+            \textbf{maximization bias}.
+            
+            For example, consider a single state $s$ where there are many actions $a$ with zero values, but estimation are uncertain and distribute
+            above and below zero. The maximum of true values are zero, but the maximum of estimates is positive, a positive bias.
+            This causes slow learning, or even stops it. Note that $\E[\max_a{Q(s,a)}] \geq \max_a{\E[Q(s,a)]} = q_*(s,a)$. This is the positive bias.
+
+        \subsubsection{Double Q-Learning}
+            To avoid this, we use two learners. Suppose that we estimate action-value function $q_*$ with two estimators, $Q_1$ and $Q_2$.
+            Then, we use one estimate, say $Q_1$, to determine the maximizing action $A^* = \arg\max_a Q_1(A,a)$, and use the other, $Q_2$,
+            to provide the estimate of its value, $Q_2(A^*)=Q_2(\arg\max_a Q_1(a))$. This estimate, is unbiased in the sense that $\E[Q_2(A^*)]=q(A^*)$.
+            We repeat this process by keep changing the role of two estimators.
+
+            \Algorithm{doubleQLearning}
+            {Double Q-learning}
+            {\inputitem{$\alpha \in (0,1]$}{step size parameter}}
+            {\inputitem{$q_*$}{optimal action-value function}}
+            {
+                \tcp{initialize}
+                \For{$i \in \{1, 2\}$}
+                {
+                    \ForEach{$(s,a) \in \mathcal{S} \times \mathcal{A}$}
+                    {$Q_i(s,a) \leftarrow
+                    \begin{cases}
+                        \text{arbitrary,} &\text{ if $s \in \mathcal{S}^+$ and $a \in \mathcal{A}(s)$} \\
+                        0 &\text{ if $s \in \mathcal{S} \setminus \mathcal{S}^+$}
+                    \end{cases}$\;}
+                }
+
+                \ForEach{episodes}
+                {
+                    initialize $S$\;
+                    \ForEach{step of episode}
+                    {
+                        choose action $A$ from $S$ using behavior policy derived from $Q_1 + Q_2$ (e.g. $\varepsilon$-greedy)\;
+                        take action $A$, observe $R$, $S'$\;
+                        $
+                        \begin{cases}
+                            \text{with probability 0.5} &Q_1(S,A) \leftarrow Q_1(S,A) + \alpha \big[ R + \gamma Q_2(S', \arg\max_a{Q_1(S',a)}) - Q_1(S,A) \big] \\
+                            \text{else} &Q_2(S,A) \leftarrow Q_2(S,A) + \alpha \big[ R + \gamma Q_1(S', \arg\max_a{Q_2(S',a)}) - Q_2(S,A) \big]
+                        \end{cases}
+                        $\;
+                        $S \leftarrow S'$\;
+                        \If{$S \in \mathcal{S} \setminus \mathcal{S}^+$}
+                        {
+                            break
+                        }
+                    }
+                }
+                \Return{$Q_1 \simeq Q_2 \simeq q_*$}
+            }
+            Note that the algorithm alternates between $Q_1$ and $Q_2$.
+
+            \begin{rem}{Generalization of Double Learning to other Algorithms}{genDoubleLearn}
+                This mechanism can be applied to any other algorithms.
+                For example, Double Expected Sarsa, we use following update:
+                \begin{align}
+                    Q_1(S_t,A_t)
+                    &\leftarrow Q_1(S_t,A_t) + \alpha\Big[ R_{t+1} + \gamma \E_{\pi_1}[Q_2(S_{t+1}, a) | S_{t+1}] - Q_1(S_t,A_t) \Big] \\
+                    &= Q_1(S_t,A_t) + \alpha\Big[ R_{t+1} + \gamma \sum_a \pi_1(a|S_{t+1})Q_2(S_{t+1},a) - Q_1(S_t,A_t) \Big]
+                \end{align}
+                where $\pi_1$ is the target policy derived from $Q_1$. The update for $Q_2$ is symmetric, interchanging subscript 1 and 2.
+            \end{rem}
+            The point is to separate the choice of the action and computation of the value of chosen action.
 
 \end{document}
