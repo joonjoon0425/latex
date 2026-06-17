@@ -1,0 +1,14 @@
+\contentsline {chapter}{\numberline {1}$n$-step Bootstrapping}{1}{chapter.1}%
+\ttl@starttoc {chapters@1}
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1.1}%
+\contentsline {section}{\numberline {2}$n$-step TD Prediction}{2}{section.1.2}%
+\contentsline {subsection}{\numberline {2.1}$n$-step Return}{2}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {2.2}Algorithm}{2}{subsection.1.2.2}%
+\contentsline {section}{\numberline {3}$n$-step TD Control}{4}{section.1.3}%
+\contentsline {subsection}{\numberline {3.1}$n$-step Sarsa}{4}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {3.2}$n$-step Expected Sarsa}{5}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {3.3}$n$-step Off-policy Learning}{5}{subsection.1.3.3}%
+\contentsline {subsection}{\numberline {3.4}Per-decision Methods with Control Variates}{6}{subsection.1.3.4}%
+\contentsline {subsection}{\numberline {3.5}Off-policy Learning without Importance Sampling: Backup Tree Algorithm}{6}{subsection.1.3.5}%
+\contentsline {subsection}{\numberline {3.6}$n$-step $Q(\sigma )$: A Unifying Algorithm}{6}{subsection.1.3.6}%
+\contentsfinish 

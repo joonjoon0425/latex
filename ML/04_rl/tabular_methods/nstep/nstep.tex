@@ -1,0 +1,237 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+\chapter{$n$-step Bootstrapping}
+\makeSubfileHeader{$n$-step Bootstrapping}
+
+\section{Introduction}
+    The \textbf{$n$-step bootstrapping} method unifies the Monte Carlo method and the one-step temporal-difference
+    method. Acutally, MC and TD are the opposite extreme of the $n$-step method.
+
+\section{$n$-step TD Prediction}
+    \subsection{$n$-step Return}
+        The original TD prediction took only one step further for the update of value function. $n$-step TD prediction
+        generalizes this, and enable to take steps more than one. That is, the target for the update is following
+        \textbf{$n$-step return};
+        \begin{defn}{$n$-step Return}{nStepReturn}
+            Let $R_t$ the reward on time step $t$ and let $V_t$ be the estimate of state-value function on time $t$.
+            Then, the \textbf{$n$-step return} $G_{t:t+n}$ is defined as
+            \begin{equation}
+                G_{t:t+n} = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots + \gamma^{n-1}R_{t+n} + \gamma^nV_{t+n-1}(S_{t+n}).
+            \end{equation}
+            for all $n,\ t$ such that $n \geq 1$ and $0 \leq t < T-n$. If $t + n \geq T$, then all the missing terms are taken as zero.
+            That is, $G_{t:t+n} = G_t$ if $t+n\geq T$.
+        \end{defn}
+        All $n$-step returns can be considered as an approximation of full return.
+        Note that using the definition above, 1-step return equals the target of the original one-step TD method, and $\infty$-step return
+        equals the target of the MC method, the full return.
+    
+    \subsection{Algorithm}
+        Using this $n$-step return, the $n$-step TD method use following update;
+        \begin{equation}
+            V_{t+n}(S_t) = V_{t+n-1}(S_t) + \alpha \Big[ G_{t:t+n} - V_{t+n-1}(S_t) \Big] \label{eq:nStepTD}
+        \end{equation}
+        while the values of all other states remain unchanged.
+
+        \Algorithm{nStepTDPred}
+        {$n$-step TD Prediction}
+        {\inputitem{$\pi$}{policy} \\
+        \inputitem{$\alpha \in (0, 1]$}{step size parameter} \\
+        \inputitem{$n > 0$}{steps to take for update}}
+        {\inputitem{$v_\pi$}{state-value function under policy $\pi$}}
+        {
+            \tcp{initialize}
+            \ForEach{$s \in \mathcal{S}$}
+            {
+                $V(s) \leftarrow$ arbitrary\;
+            }
+
+            \ForEach{episode}
+            {
+                $S_0 \leftarrow$ arbitrary state other than terminal state\;
+                store $S_0$\;
+                $T \leftarrow \infty$\;
+                \For{$t = 0, 1, 2, \dots$}
+                {
+                    \If{$t < T$}
+                    {
+                        take an action according to $\pi(\cdot|S_t)$\;
+                        observe and store the next reward as $R_{t+1}$ and the next state as $S_{t+1}$\;
+                        \If{$S_{t+1}$ is terminal}
+                        {
+                            $T \leftarrow t+1$\;
+                        }
+                    }
+                    $\tau \leftarrow t-n+1$\;
+                    \If{$\tau = T - 1$}
+                    {        
+                        break\;
+                    }
+                    \ElseIf{$\tau \geq 0$}
+                    {
+                        $G \leftarrow
+                        \begin{cases}
+                            \sum_{i=\tau + 1}^{\tau + n} \gamma^{i-\tau-1}R_i + \gamma^n V(S_{\tau + n}) &\text{if $\tau + n < T$}\\
+                            \sum_{i=\tau + 1}^T \gamma^{i-\tau-1}R_i &\text{if $\tau + n \geq T$}
+                        \end{cases}\qquad\qquad(G_{\tau:\tau+n})$\;
+                        $V(S_\tau) \leftarrow V(S_\tau) + \alpha \big[ G - V(S_\tau) \big]$\;
+                        
+                    }
+                    
+                }
+            }
+            \Return{$V \simeq v_\pi$}
+        }
+
+        The $n$-step TD prediction has an important property called \textbf{error reduction property}.
+        The worst error of the expected $n$-step return is guaranteed to be less than or equal to $\gamma^n$ times the worst error under $V_{t+n-1}$;
+        \begin{defn}{Error Reduction Property}{errorReducProp}
+            Let $V_{t+n-1}$ be the $n$-step estimation of $v_\pi$, and let $G_{t:t+n}$ be the $n$-step return.
+            Then, following inequality holds;
+            \begin{equation}
+                \max_s{\Big| \E_\pi[G_{t:t+n}|S_t=s] - v_\pi(s) \Big|} \leq \gamma^n \max_s{\Big| V_{t+n-1}(s) - v_\pi(s) \Big|}
+            \end{equation}
+            for all $n \geq 1$.
+        \end{defn}
+        Since the estimate $V_{t+n-1}$ targets $G_{t:t+n}$ as one can see in the update equation \ref{eq:nStepTD}, one can show formally that
+        all $n$-step methods converge to the correct prediction, under appropriate technical conditions.
+
+\section{$n$-step TD Control}
+    \subsection{$n$-step Sarsa}
+        Instead of using state-value function, we use action-value function for the estimation. That is, we define the $n$-step return as
+        \begin{equation}
+            G_{t:t+n} = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots + \gamma^{n-1} R_{t+n} + \gamma^n Q_{t+n-1}(S_{t+n},A_{t+n})
+        \end{equation}
+        for $n \geq 1$ and $0 \leq t < T-n$.
+        For $t+n \geq T$, $G_{t:t+n}=G_t$. Then, the natural update for $n$-step Sarsa is
+        \begin{equation}
+            Q_{t+n}(S_t,A_t) = Q_{t+n-1}(S_t,A_t) + \alpha \Big[ G_{t:t+n} - Q_{t+n-1}(S_t,A_t) \Big]
+        \end{equation}
+        for $0 \leq t < T$, with values of other states remain unchanged.
+
+        \Algorithm{nStepSarsa}
+        {$n$-step Sarsa}
+        {\inputitem{$\alpha \in (0,1]$}{step size parameter}\\
+        \inputitem{$0 < \varepsilon < 1$}{probability of exploring}\\
+        \inputitem{$n$}{steps to take for update}}
+        {\inputitem{$q_*$}{the optimal action-value function}}
+        {
+            \tcp{initialize}
+            \ForEach{$(s,a) \in \mathcal{S} \times \mathcal{A}$}
+            {
+                $Q(s,a) \leftarrow$ arbitrary\;
+            }
+            $\pi \leftarrow$ $\varepsilon$-greedy policy with respect to $Q$\;
+            
+            \ForEach{episode}
+            {
+                $S_0 \leftarrow$ arbitrary other than terminal state\;
+                store $S_0$\;
+                select and store an action $A_0 \sim \pi(\cdot|S_0)$\;
+                $T \leftarrow \infty$\;
+                \For{$t = 0, 1, 2, \dots$}
+                {
+                    \If{$t < T$}
+                    {
+                        take action $A_t$\;
+                        observe and store the next reward as $R_{t+1}$ and the next state as $S_{t+1}$\;
+                        \eIf{$S_t$ is terminal}
+                        {
+                            $T \leftarrow t+1$\;
+                        }
+                        {
+                            select and store an action $A_{t+1} \sim \pi(\cdot|S_{t+1})$\;
+                        }
+                    }
+                    $\tau \leftarrow t - n + 1$\;
+                    \If{$\tau = T-1$}{break}
+                    \ElseIf{$\tau \geq 0$}
+                    {
+                        $G \leftarrow
+                        \begin{cases}
+                            \sum_{i=\tau + 1}^{\tau + n} \gamma^{i-\tau-1}R_i + \gamma^n Q(S_{\tau + n},A_{\tau+n}) &\text{if $\tau + n < T$}\\
+                            \sum_{i=\tau + 1}^T \gamma^{i-\tau-1}R_i &\text{if $\tau + n \geq T$}
+                        \end{cases}\qquad\qquad(G_{\tau:\tau+n})$\;
+                        $Q(S_\tau,A_\tau) \leftarrow Q(S_\tau,A_\tau) + \alpha \big[ G - Q(S_\tau,A_\tau) \big]$\;
+                        If $\pi$ is being learned, then ensure that $\pi(\cdot|S_\tau)$ is $\varepsilon$-greedy with respect to $Q$\;
+                    }
+                }
+            }
+        }
+    \subsection{$n$-step Expected Sarsa}
+        The $n$-step Expected Sarsa uses following $n$-step return;
+        \begin{equation}
+            G_{t:t+n} = R_{t+1} + \cdots + \gamma^{n-1}R_{t+n} + \gamma^n \bar{V}_{t+n-1}(S_{t+n})
+        \end{equation}
+        for $t+n < T$, with $G_{t:t+n}=G_t$ for $t+n>T$. The $\bar{V}_{t}(s)$ is the \emph{expected approximate value} of state $s$, defined as
+        \begin{equation}
+            \bar{V}_t(s) = \sum_a \pi(a|s)Q_t(s,a)
+        \end{equation}
+        for all $s \in \mathcal{S}$ under the target policy $\pi$.
+
+    \subsection{$n$-step Off-policy Learning}
+        Off-policy method uses two policies, the target policy $\pi$ and behavior policy $b$. The behavior policy explores state-action pair and
+        target policy learns the optimal policy of the problem. Since the expectation of the return depends on the behavior policy instead of the target policy,
+        we multiply the \emph{importance sampling ratio}, defined as $\rho_{t:h}=\prod_{k=t}^{\min(h,T-1)}\frac{\pi(A_k|S_k)}{b(A_k|S_k)}$.
+        Then, the update is
+        \begin{equation}
+            V_{t+n}(S_t) = V_{t+n-1}(S_t) + \alpha\rho_{t:t+n-1}\Big[ G_{t:t+n} - V_{t+n-1}(S_t) \Big]
+        \end{equation}
+        for $0 \leq t < T$, and
+        \begin{equation}
+            Q_{t+n}(S_t,A_t) = Q_{t+n-1}(S_t,A_t) + \alpha \rho_{t+1:t+n}\Big[ G_{t:t+n} - Q_{t+n-1}(S_t,A_t) \Big]
+        \end{equation}
+        for $0 \leq t < T$.
+
+        \Algorithm{offPolicyNStepSarsa}
+        {Off-policy $n$-step Sarsa}
+        {\inputitem{$b$}{an arbitrary behavior policy such that $b(a|s) > 0$ for all $s \in \mathcal{S}$, $a \in mathcal{A}}$ \\
+        \inputitem{$\alpha \in (0,1]$}{step size parameter} \\
+        \inputitem{$n$}{steps to take for update}}
+        {\inputitem{$q_*$}{optimal action-value function}}
+        {
+            \tcp{initialize}
+            \ForEach{$(s,a) \in \mathcal{S}\times\mathcal{A}$}
+            {
+                $Q(s,a) \leftarrow$ arbitrary\;
+            }
+            \ForEach{episode}
+            {
+                initialize and store $S_0$, which is not terminal state\;
+                select and store an action $A_0 \sim b(\cdot|S_0)$\;
+                $T \leftarrow \infty$\;
+                \For{$t = 0,1,2,\dots$}
+                {
+                    \If{$t < T$}
+                    {
+                        take action $A_t$\;
+                        observe and store the next reward as $R_{t+1}$ and the next state as $S_{t+1}$\;
+                        \eIf{$S_{t+1}$ is terminal}
+                        {
+                            $T \leftarrow t+1$\;
+                        }
+                        {
+                            select and store an action $A_{t+1} \sim b(\cdot|S_{t+1})$\;
+                        }
+                    }
+                    $\tau \leftarrow t-n+1$\;
+                    \If{$\tau = T-1$}{break}
+                    \ElseIf{$\tau \geq 0$}
+                    {
+                        $\rho \leftarrow \prod_{i=\tau+1}^{\min{(\tau+n-1,T-1)}}\frac{\pi(A_i|S_i)}{b(A_i|S_i)}$\;
+                        $G \leftarrow
+                        \begin{cases}
+                            \sum_{i=\tau + 1}^{\tau + n} \gamma^{i-\tau-1}R_i + \gamma^n Q(S_{\tau + n},A_{\tau+n}) &\text{if $\tau + n < T$}\\
+                            \sum_{i=\tau + 1}^T \gamma^{i-\tau-1}R_i &\text{if $\tau + n \geq T$}
+                        \end{cases}\qquad\qquad(G_{\tau:\tau+n})$\;
+                        $Q(S_\tau,A_\tau) \leftarrow Q(S_\tau,A_\tau) + \alpha\rho\big[ G - Q(S_\tau,A_\tau) \big]$\;
+                        If $\pi$ is being learned, then ensure that $\pi(\cdot|S_\tau)$ is greedy with respect to $Q$\;
+                    }
+                }
+            }
+        }
+    \subsection{Per-decision Methods with Control Variates}
+    \subsection{Off-policy Learning without Importance Sampling: Backup Tree Algorithm}
+    \subsection{$n$-step $Q(\sigma)$: A Unifying Algorithm}
+        
+\end{document}
